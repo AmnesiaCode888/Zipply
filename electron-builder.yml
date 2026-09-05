@@ -1,0 +1,48 @@
+appId: com.zipply.app
+productName: Zipply
+artifactName: "${productName}-${version}-${os}-${arch}.${ext}"
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - out/**/*
+  - resources/**/*
+  - package.json
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.ico
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Zipply
+
+linux:
+  target:
+    - target: deb
+      arch:
+        - x64
+  icon: build/icons
+  category: Development
+  maintainer: Zipply Team <amnesiacoder@gmail.com>
+  synopsis: Zipply - Simple Ai Agent
+  description: Zipply - Simple Ai Agent
+
+deb:
+  depends:
+    - gconf2
+    - gconf-service
+    - libnotify4
+    - libappindicator1
+    - libxtst6
+    - libnss3
+    - libasound2
+    - libsecret-1-0

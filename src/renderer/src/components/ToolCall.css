@@ -1,0 +1,674 @@
+/* ══════════════════════════════════════════════════════════════════════════════
+   UNIFIED MATTE CODE, DIFF, TERMINAL, WEB & AGENT VIEWERS
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.unified-tool-box,
+.unified-terminal-box {
+  position: relative;
+  background-color: var(--code-bg, var(--bg-surface, #0E0E10));
+  border: 1px solid var(--code-border, var(--border-card, #1E1E22));
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 3px 0 6px 0;
+  width: 100%;
+  box-shadow: none;
+  box-sizing: border-box;
+}
+
+/* Floating Copy Button with crisp matte pill backdrop */
+.unified-copy-btn {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background-color: var(--card-bg, rgba(14, 14, 16, 0.9));
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  color: var(--text-muted, #71717A);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+  outline: none;
+}
+
+.unified-tool-box:hover .unified-copy-btn,
+.unified-terminal-box:hover .unified-copy-btn {
+  opacity: 1;
+}
+
+.unified-copy-btn:hover {
+  color: var(--text-primary, #FFFFFF);
+  background-color: var(--card-bg-hover, #1E1E24);
+  border-color: var(--border-hover, rgba(255, 255, 255, 0.14));
+}
+
+.copied-check {
+  color: #10B981;
+}
+
+/* Full-width scroll container with 0 horizontal padding so diff lines span edge-to-edge */
+.unified-code-scroll,
+.terminal-stream-body {
+  padding: 4px 0;
+  max-height: 280px;
+  overflow-y: auto;
+  overflow-x: auto;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--code-text, var(--text-primary, #D4D4D8));
+  box-sizing: border-box;
+  width: 100%;
+}
+
+/* ─── 1. Diff Rows (Full-Width Edge-to-Edge) ─── */
+.unified-diff-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 1.5px 32px 1.5px 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.unified-diff-row.diff-add {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+
+.unified-diff-row.diff-del {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #DC2626;
+}
+
+.unified-diff-row.diff-ctx {
+  color: var(--text-muted, #9CA3AF);
+}
+
+.diff-prefix-char {
+  font-size: 11px;
+  width: 12px;
+  text-align: center;
+  user-select: none;
+  flex-shrink: 0;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.diff-code-text {
+  flex: 1;
+}
+
+/* ─── 2. Normal Code Rows (Full-Width Edge-to-Edge) ─── */
+.unified-code-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 1.5px 32px 1.5px 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.unified-ln {
+  font-size: 11px;
+  color: var(--text-muted, #4A4A54);
+  width: 22px;
+  text-align: right;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.unified-code-text {
+  flex: 1;
+}
+
+/* ─── 3. Terminal Stream (Full-Width Edge-to-Edge) ─── */
+.term-prompt-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 3px 32px 4px 10px;
+  color: var(--text-primary, #FFFFFF);
+  font-size: 12px;
+}
+
+.term-dollar {
+  color: var(--text-muted, #71717A);
+  font-weight: 600;
+  user-select: none;
+}
+
+.term-cmd-bold {
+  color: var(--text-primary, #FFFFFF);
+  font-weight: 550;
+}
+
+.term-output-row {
+  display: flex;
+  align-items: baseline;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 1px 32px 1px 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-secondary, #A1A1AA);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.term-output-row.term-pass {
+  color: var(--text-primary, #D4D4D8);
+}
+
+.term-output-row.term-fail {
+  color: #DC2626;
+}
+
+.term-row-txt {
+  flex: 1;
+}
+
+/* ─── 4. Grep ─── */
+.unified-grep-group {
+  margin-bottom: 6px;
+  width: 100%;
+}
+
+.unified-grep-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-primary, #E4E4E7);
+  padding: 2px 10px;
+  background: var(--card-bg, rgba(255, 255, 255, 0.02));
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.unified-empty-msg {
+  padding: 6px 10px;
+  color: var(--text-muted, #71717A);
+  font-size: 12px;
+}
+
+/* ─── 5. Web Search & Reader ─── */
+.web-search-query-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 36px 6px 10px;
+  border-bottom: 1px solid var(--border-subtle, #1E1E22);
+  background: var(--card-bg, rgba(255, 255, 255, 0.015));
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.web-search-icon {
+  color: var(--text-muted, #8E8E93);
+  flex-shrink: 0;
+}
+
+.web-search-query-text {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-primary, #E4E4E7);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.web-search-count-tag {
+  font-size: 11px;
+  color: var(--text-muted, #71717A);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.web-search-results-list {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.web-search-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.03));
+}
+
+.web-search-item:last-child {
+  border-bottom: none;
+}
+
+.web-search-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.web-search-title-link {
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--text-primary, #FFFFFF);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.web-search-title-link:hover {
+  text-decoration: underline;
+  color: var(--accent-primary, #E4E4E7);
+}
+
+.web-ext-icon {
+  color: var(--text-muted, #71717A);
+  flex-shrink: 0;
+}
+
+.web-search-domain {
+  font-size: 11px;
+  color: var(--text-muted, #71717A);
+  flex-shrink: 0;
+}
+
+.web-search-snippet {
+  font-size: 11.5px;
+  color: var(--text-secondary, #A1A1AA);
+  line-height: 1.45;
+}
+
+.web-page-url-link {
+  font-size: 12px;
+  color: var(--text-secondary, #D4D4D8);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.web-page-url-link:hover {
+  color: var(--text-primary, #FFFFFF);
+  text-decoration: underline;
+}
+
+.web-search-body-raw {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-secondary, #D4D4D8);
+  line-height: 1.5;
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ─── 6. Memory Viewer ─── */
+.memory-viewer-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 36px 6px 10px;
+  border-bottom: 1px solid var(--border-subtle, #1E1E22);
+  background: var(--card-bg, rgba(255, 255, 255, 0.015));
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.memory-icon {
+  color: var(--text-muted, #8E8E93);
+  flex-shrink: 0;
+}
+
+.memory-title {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--text-primary, #E4E4E7);
+}
+
+.memory-category-tag {
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--pill-bg, rgba(255, 255, 255, 0.05));
+  color: var(--text-secondary, #A1A1AA);
+}
+
+.memory-body-content {
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: var(--text-secondary, #D4D4D8);
+  line-height: 1.5;
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.memory-tags-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 8px 12px;
+  flex-wrap: wrap;
+}
+
+.memory-tag-icon {
+  color: var(--text-muted, #71717A);
+}
+
+.memory-tag-pill {
+  font-size: 10.5px;
+  color: var(--text-secondary, #8E8E93);
+  background: var(--pill-bg, rgba(255, 255, 255, 0.04));
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+/* ─── 7. Subagent Viewer ─── */
+.subagent-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 36px 6px 10px;
+  border-bottom: 1px solid var(--border-subtle, #1E1E22);
+  background: var(--card-bg, rgba(255, 255, 255, 0.015));
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.subagent-icon {
+  color: var(--text-muted, #8E8E93);
+  flex-shrink: 0;
+}
+
+.subagent-name {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--text-primary, #E4E4E7);
+}
+
+.subagent-prompt-box {
+  margin: 8px 12px 4px 12px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  background: var(--card-bg, rgba(255, 255, 255, 0.025));
+  border-left: 2px solid var(--border-hover, #3F3F46);
+  font-size: 11.5px;
+  color: var(--text-secondary, #A1A1AA);
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.subagent-answer-body {
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: var(--text-secondary, #D4D4D8);
+  line-height: 1.5;
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ─── 8. SubagentViewer (new) ─── */
+.subagent-viewer-root {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.subagent-viewer-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.subagent-viewer-bot-icon {
+  color: var(--text-muted, #71717A);
+  flex-shrink: 0;
+}
+
+.subagent-viewer-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-primary, #A1A1AA);
+  letter-spacing: 0.01em;
+  flex: 1;
+}
+
+.subagent-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 3px;
+  background: var(--btn-bg, rgba(255,255,255,0.05));
+  border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+  color: var(--text-muted, #71717A);
+  font-size: 10px;
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s;
+}
+.subagent-copy-btn:hover {
+  color: var(--text-primary, #e4e4e7);
+  background: var(--btn-bg-hover, rgba(255,255,255,0.09));
+}
+
+.subagent-viewer-prompt {
+  font-size: 11px;
+  color: var(--text-secondary, #71717A);
+  background: var(--card-bg, rgba(255,255,255,0.03));
+  border-left: 2px solid var(--border-hover, #3F3F46);
+  padding: 3px 7px;
+  border-radius: 0 3px 3px 0;
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Steps block */
+.subagent-steps-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border-subtle, #1E1E22);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.subagent-steps-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: var(--card-bg, rgba(255,255,255,0.025));
+  color: var(--text-muted, #71717A);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  width: 100%;
+  text-align: left;
+  transition: color 0.12s, background 0.12s;
+  user-select: none;
+}
+.subagent-steps-toggle:hover {
+  color: var(--text-primary, #A1A1AA);
+  background: var(--card-bg-hover, rgba(255,255,255,0.04));
+}
+
+.subagent-steps-chevron {
+  transition: transform 0.2s ease;
+  color: var(--text-muted, #52525B);
+}
+.subagent-steps-chevron.open {
+  transform: rotate(0deg);
+}
+.subagent-steps-toggle:not(.expanded) .subagent-steps-chevron {
+  transform: rotate(-90deg);
+}
+
+/* Accordion via max-height */
+.subagent-steps-accordion {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.subagent-steps-accordion.open {
+  max-height: 600px;
+}
+
+.subagent-steps-list {
+  display: flex;
+  flex-direction: column;
+  padding: 3px 0;
+  border-top: 1px solid var(--border-subtle, #1E1E22);
+}
+
+.subagent-step-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.subagent-step-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  color: var(--text-secondary, #71717A);
+  min-height: 22px;
+  transition: background 0.1s;
+}
+.subagent-step-row.has-details {
+  cursor: pointer;
+}
+.subagent-step-row.has-details:hover {
+  background: var(--card-bg-hover, rgba(255,255,255,0.03));
+  color: var(--text-primary, #A1A1AA);
+}
+.subagent-step-row.is-error {
+  color: #DC2626;
+}
+
+.subagent-step-icon-wrap {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.subagent-step-icon {
+  color: var(--text-muted, #52525B);
+}
+.subagent-step-row:hover .subagent-step-icon {
+  color: var(--text-primary, #71717A);
+}
+
+.subagent-step-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.subagent-step-status {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.subagent-step-done-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-muted, #3F3F46);
+  display: inline-block;
+}
+.subagent-step-err-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #DC2626;
+  display: inline-block;
+}
+
+.subagent-step-arrow {
+  color: var(--text-muted, #52525B);
+  transition: transform 0.15s ease;
+}
+.subagent-step-arrow.open {
+  transform: rotate(90deg);
+}
+
+.subagent-step-detail {
+  background: var(--card-bg, rgba(0,0,0,0.2));
+  border-top: 1px solid var(--border-subtle, #1E1E22);
+}
+.subagent-step-result {
+  padding: 6px 10px;
+  font-family: var(--font-mono, monospace);
+  font-size: 10.5px;
+  color: var(--text-secondary, #71717A);
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-y: auto;
+  max-height: 150px;
+  margin: 0;
+}
+
+/* Final answer area */
+.subagent-viewer-answer {
+  font-size: 12.5px;
+  color: var(--text-primary, #D4D4D8);
+  line-height: 1.55;
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  border-top: 1px solid var(--border-subtle, #1E1E22);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+/* Swarm result block */
+.subagent-swarm-result {
+  border-top: 1px solid var(--border-subtle, #1E1E22);
+  padding-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.subagent-swarm-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-secondary, #71717A);
+  font-weight: 600;
+}
+
+/* Spin animation */
+.subagent-spin {
+  animation: subagent-spin-anim 1s linear infinite;
+  color: var(--text-muted, #52525B);
+}
+@keyframes subagent-spin-anim {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Empty/loading state */
+.subagent-viewer-empty {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--text-muted, #52525B);
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}

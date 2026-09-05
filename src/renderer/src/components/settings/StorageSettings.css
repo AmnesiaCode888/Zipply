@@ -1,0 +1,222 @@
+/* ==========================================================================
+   StorageSettings.css — zipply Minimalist Storage & Workspace Surface
+   ========================================================================== */
+
+.storage-settings-root {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 0 0 40px 0;
+  box-sizing: border-box;
+  gap: 20px;
+  user-select: text;
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  animation: smoothFadeIn 0.15s ease-out;
+}
+
+@keyframes smoothFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Header */
+.storage-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+}
+
+.storage-header-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.storage-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.storage-page-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary, #FFFFFF);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.storage-platform-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: #38BDF8;
+  background-color: rgba(56, 189, 248, 0.12);
+  padding: 2px 8px;
+  border-radius: 9999px;
+}
+
+.storage-toast-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: #059669;
+  background-color: rgba(16, 185, 129, 0.12);
+  padding: 2px 8px;
+  border-radius: 9999px;
+  animation: smoothFadeIn 0.2s ease;
+}
+
+.storage-toast-chip.error {
+  color: #DC2626;
+  background-color: rgba(239, 68, 68, 0.12);
+}
+
+.storage-page-subtitle {
+  font-size: 12.5px;
+  color: var(--text-muted, #777777);
+  margin: 0;
+}
+
+.storage-icon-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background-color: var(--btn-bg, rgba(255, 255, 255, 0.05));
+  border: none;
+  border-radius: 8px;
+  color: var(--text-muted, #888888);
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.storage-icon-action-btn:hover {
+  background-color: var(--btn-bg-hover, rgba(255, 255, 255, 0.1));
+  color: var(--text-primary, #FFFFFF);
+}
+
+/* Surface Container */
+.storage-options-surface {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  background-color: var(--card-bg, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border-card, transparent);
+  border-radius: 16px;
+  padding: 0 18px;
+  box-sizing: border-box;
+}
+
+.storage-option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 62px;
+  border-bottom: 1px solid var(--border-subtle, #1E1E1E);
+  gap: 16px;
+  padding: 12px 0;
+  box-sizing: border-box;
+}
+
+.storage-option-row:last-child {
+  border-bottom: none;
+}
+
+.storage-option-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.storage-option-headline {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-primary, #CCCCCC);
+  white-space: nowrap;
+}
+
+.storage-option-subline {
+  font-size: 12px;
+  color: var(--text-muted, #666666);
+  white-space: nowrap;
+}
+
+/* Controls */
+.storage-row-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.storage-path-pill {
+  font-size: 12px;
+  color: var(--text-secondary, #888888);
+  background-color: var(--pill-bg, rgba(255, 255, 255, 0.05));
+  border: none;
+  border-radius: 8px;
+  height: 30px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.storage-ctrl-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 12px;
+  background-color: var(--btn-bg, rgba(255, 255, 255, 0.08));
+  border: none;
+  border-radius: 8px;
+  color: var(--text-primary, #CCCCCC);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.storage-ctrl-btn:hover:not(:disabled) {
+  background-color: var(--btn-bg-hover, rgba(255, 255, 255, 0.14));
+  color: var(--text-primary, #FFFFFF);
+}
+
+.storage-ctrl-btn.icon-only {
+  padding: 0 8px;
+}
+
+.storage-ctrl-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.text-green {
+  color: #059669;
+}

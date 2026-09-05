@@ -1,0 +1,209 @@
+import React from 'react'
+import { PanelLeft, X, Trash2 } from 'lucide-react'
+import { useWindowControls } from '../hooks/useWindowControls'
+import { SettingsTab } from '../types/settings'
+import './TitleBar.css'
+
+interface TitleBarProps {
+  isSidebarOpen?: boolean
+  chatTitle?: string | null
+  isSettingsOpen?: boolean
+  activeSettingsTab?: SettingsTab
+  activeNavTab?: 'dialogs' | 'notes' | 'skills'
+  onToggleSidebar?: () => void
+  onNewChat?: () => void
+  onDeleteChat?: () => void
+  onCloseSettings?: () => void
+}
+
+const SETTINGS_TAB_NAMES: Record<SettingsTab, string> = {
+  models: 'Конфигурация',
+  mcp: 'MCP Серверы',
+  appearance: 'Темы и оформление',
+  shortcuts: 'Горячие клавиши',
+  storage: 'Локальное хранилище'
+}
+
+export const TitleBar: React.FC<TitleBarProps> = ({
+  isSidebarOpen = false,
+  chatTitle = null,
+  isSettingsOpen = false,
+  activeSettingsTab = 'models',
+  activeNavTab = 'dialogs',
+  onToggleSidebar,
+  onNewChat,
+  onDeleteChat,
+  onCloseSettings
+}) => {
+  const { isMaximized, minimize, maximize, close } = useWindowControls()
+
+  const handleDoubleClick = (): void => {
+    maximize()
+  }
+
+  return (
+    <header className="titlebar" onDoubleClick={handleDoubleClick}>
+      {isSettingsOpen ? (
+        <div className="top-nav-left chat-mode">
+          {!isSidebarOpen && (
+            <button
+              type="button"
+              className="sidebar-toggle-btn"
+              title="Боковая панель"
+              aria-label="Боковая панель"
+              onClick={onToggleSidebar}
+            >
+              <PanelLeft size={20} strokeWidth={1.8} />
+            </button>
+          )}
+
+          <div className="chat-titlebar-title">
+            <span className="chat-title-text">
+              Настройки / {SETTINGS_TAB_NAMES[activeSettingsTab]}
+            </span>
+          </div>
+
+          {onCloseSettings && (
+            <button
+              type="button"
+              className="settings-close-pill"
+              onClick={onCloseSettings}
+              title="Закрыть настройки (Esc)"
+            >
+              <X size={13} strokeWidth={2.2} />
+              <span>Закрыть</span>
+            </button>
+          )}
+        </div>
+      ) : activeNavTab === 'skills' ? (
+        <div className="top-nav-left chat-mode">
+          {!isSidebarOpen && (
+            <button
+              type="button"
+              className="sidebar-toggle-btn"
+              title="Боковая панель"
+              aria-label="Боковая панель"
+              onClick={onToggleSidebar}
+            >
+              <PanelLeft size={20} strokeWidth={1.8} />
+            </button>
+          )}
+
+          <div className="chat-titlebar-title">
+            <span className="chat-title-text">Библиотека навыков (Skills)</span>
+          </div>
+        </div>
+      ) : activeNavTab === 'notes' ? (
+        <div className="top-nav-left chat-mode">
+          {!isSidebarOpen && (
+            <button
+              type="button"
+              className="sidebar-toggle-btn"
+              title="Боковая панель"
+              aria-label="Боковая панель"
+              onClick={onToggleSidebar}
+            >
+              <PanelLeft size={20} strokeWidth={1.8} />
+            </button>
+          )}
+
+          <div className="chat-titlebar-title">
+            <span className="chat-title-text">Заметки и Память ИИ</span>
+          </div>
+        </div>
+      ) : chatTitle ? (
+        <div className="top-nav-left chat-mode">
+          {!isSidebarOpen && (
+            <button
+              type="button"
+              className="sidebar-toggle-btn"
+              title="Боковая панель"
+              aria-label="Боковая панель"
+              onClick={onToggleSidebar}
+            >
+              <PanelLeft size={20} strokeWidth={1.8} />
+            </button>
+          )}
+
+          <div className="chat-titlebar-title" title={chatTitle}>
+            <span className="chat-title-text">{chatTitle}</span>
+          </div>
+
+          {onDeleteChat && (
+            <button
+              type="button"
+              className="chat-titlebar-delete-btn"
+              onClick={onDeleteChat}
+              title="Удалить этот диалог"
+              aria-label="Удалить этот диалог"
+            >
+              <Trash2 size={14} strokeWidth={1.8} />
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className={`top-nav-left ${isSidebarOpen ? 'hidden' : ''}`}>
+          <button
+            type="button"
+            className="new-chat-pill"
+            title="Новый чат"
+            onClick={onNewChat}
+          >
+            Новый чат
+          </button>
+
+          <button
+            type="button"
+            className="sidebar-toggle-btn"
+            title="Боковая панель"
+            aria-label="Боковая панель"
+            onClick={onToggleSidebar}
+          >
+            <PanelLeft size={20} strokeWidth={1.8} />
+          </button>
+        </div>
+      )}
+
+      <div className="titlebar-drag-spacer" />
+
+      <div className="window-controls">
+        <button
+          className="control-btn btn-green"
+          onClick={maximize}
+          title={isMaximized ? 'Восстановить' : 'Развернуть'}
+          aria-label={isMaximized ? 'Restore' : 'Maximize'}
+        >
+          <svg viewBox="0 0 10 10" fill="currentColor">
+            {isMaximized ? (
+              <path d="M2.5 4.5l2.5-2.5 2.5 2.5M7.5 5.5l-2.5 2.5-2.5-2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            ) : (
+              <path d="M2 2l6 6M8 2L2 8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            )}
+          </svg>
+        </button>
+        <button
+          className="control-btn btn-yellow"
+          onClick={minimize}
+          title="Свернуть"
+          aria-label="Minimize"
+        >
+          <svg viewBox="0 0 10 10" fill="currentColor">
+            <path d="M1.5 5h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </button>
+        <button
+          className="control-btn btn-red"
+          onClick={close}
+          title="Закрыть"
+          aria-label="Close"
+        >
+          <svg viewBox="0 0 10 10" fill="currentColor">
+            <path d="M1.5 1.5l7 7m0-7l-7 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
+    </header>
+  )
+}
+
+export default TitleBar

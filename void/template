@@ -1,0 +1,37 @@
+# Template file for 'zipply'
+pkgname=zipply
+version=0.4.0
+revision=1
+archs="x86_64"
+create_wrksrc=yes
+depends="gtk+3 alsa-lib dbus-glib libnotify nss libXtst libsecret xdg-utils"
+short_desc="Zipply - Simple Ai Agent"
+maintainer="Zipply Team <amnesiacoder@gmail.com>"
+license="BSL-1.1"
+homepage="https://zipply.app"
+nostrip=yes
+nopie=yes
+
+# При установке из локального бинарного tar/zip/deb или сборке из исходников:
+do_install() {
+	vmkdir opt/zipply
+	vcopy "opt/zipply/*" opt/zipply/
+
+	vmkdir usr/bin
+	ln -sf /opt/zipply/zipply ${DESTDIR}/usr/bin/zipply
+
+	vmkdir usr/share/applications
+	vinstall usr/share/applications/zipply.desktop 644 usr/share/applications
+
+	for size in 16 24 32 48 64 128 256 512; do
+		if [ -f "usr/share/icons/hicolor/${size}x${size}/apps/zipply.png" ]; then
+			vmkdir "usr/share/icons/hicolor/${size}x${size}/apps"
+			vinstall "usr/share/icons/hicolor/${size}x${size}/apps/zipply.png" 644 "usr/share/icons/hicolor/${size}x${size}/apps"
+		fi
+	done
+
+	if [ -f "usr/share/pixmaps/zipply.png" ]; then
+		vmkdir usr/share/pixmaps
+		vinstall usr/share/pixmaps/zipply.png 644 usr/share/pixmaps
+	fi
+}

@@ -1,0 +1,47 @@
+.mcp-import-info-box {
+  background-color: var(--card-bg, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mcp-import-info-box p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-secondary, #a1a1aa);
+  line-height: 1.4;
+}
+
+.mcp-import-info-box code {
+  background-color: var(--pill-bg, rgba(255, 255, 255, 0.08));
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono, monospace);
+  font-size: 11.5px;
+  color: var(--text-primary, #e2e2e6);
+}
+
+.mcp-sample-btn {
+  background-color: var(--btn-bg, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  color: var(--text-secondary, #d1d5db);
+  border-radius: 9999px;
+  padding: 5px 12px;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.mcp-sample-btn:hover {
+  background-color: var(--btn-bg-hover, rgba(255, 255, 255, 0.12));
+  color: var(--text-primary, #ffffff);
+}

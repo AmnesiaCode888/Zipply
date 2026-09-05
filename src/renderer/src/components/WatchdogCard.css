@@ -1,0 +1,108 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   WatchdogCard — inline alert that appears in the chat feed
+   Design goal: noticeable but subtle; same dark system as the rest of the app.
+───────────────────────────────────────────────────────────────────────────── */
+
+.watchdog-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border-radius: 8px;
+  margin: 4px 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  animation: watchdog-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  border: 1px solid transparent;
+  max-width: 640px;
+  transition: opacity 0.4s ease, border-color 0.4s ease;
+}
+
+/* Resolved: session ended — dim the card to show it's historical */
+.watchdog-resolved {
+  opacity: 0.35;
+  border-color: transparent !important;
+}
+
+@keyframes watchdog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── warn variant ─────────────────────────────────────── */
+.watchdog-warn {
+  background-color: rgba(255, 189, 46, 0.1);
+  border-color: rgba(255, 189, 46, 0.25);
+  color: var(--text-primary, rgba(255, 255, 255, 0.85));
+}
+
+.watchdog-warn .watchdog-icon-wrap {
+  color: #D97706;
+  opacity: 0.95;
+}
+
+.watchdog-warn .watchdog-label {
+  color: #D97706;
+}
+
+/* ── intervene variant ────────────────────────────────── */
+.watchdog-intervene {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.25);
+  color: var(--text-primary, rgba(255, 255, 255, 0.85));
+}
+
+.watchdog-intervene .watchdog-icon-wrap {
+  color: #DC2626;
+  opacity: 0.95;
+}
+
+.watchdog-intervene .watchdog-label {
+  color: #DC2626;
+}
+
+/* ── inner layout ─────────────────────────────────────── */
+.watchdog-icon-wrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.watchdog-body {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.watchdog-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  opacity: 0.95;
+}
+
+.watchdog-message {
+  font-size: 12.5px;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.watchdog-count {
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+  color: var(--text-muted, rgba(255, 255, 255, 0.4));
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 8px;
+}

@@ -1,0 +1,407 @@
+.mcp-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+  animation: mcpModalFadeIn 0.15s ease-out;
+}
+
+@keyframes mcpModalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.mcp-modal-container {
+  background-color: var(--bg-surface, #161616);
+  border: 1px solid var(--border-card, rgba(255, 255, 255, 0.09));
+  border-radius: 22px;
+  width: 100%;
+  max-width: 580px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35), 0 0 0 1px var(--border-subtle, rgba(255, 255, 255, 0.05));
+  font-family: var(--font-custom-family, 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
+  animation: mcpModalSlideUp 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes mcpModalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mcp-modal-header {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--card-bg, rgba(255, 255, 255, 0.02));
+}
+
+.mcp-modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mcp-modal-icon-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background-color: var(--btn-bg, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary, #ffffff);
+}
+
+.mcp-modal-title {
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--text-primary, #ffffff);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.mcp-modal-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary, #8e8e93);
+  margin: 2px 0 0 0;
+}
+
+.mcp-modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #8e8e93);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.mcp-modal-close-btn:hover {
+  color: var(--text-primary, #ffffff);
+  background-color: var(--btn-bg-hover, rgba(255, 255, 255, 0.08));
+}
+
+/* Mode Switch Tabs */
+.mcp-modal-mode-switch {
+  display: flex;
+  align-items: center;
+  padding: 10px 22px;
+  background-color: var(--card-bg, rgba(255, 255, 255, 0.03));
+  border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.05));
+  gap: 6px;
+}
+
+.mcp-mode-pill {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #8e8e93);
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.mcp-mode-pill:hover {
+  color: var(--text-primary, #ffffff);
+}
+
+.mcp-mode-pill.active {
+  background-color: var(--btn-bg-hover, rgba(255, 255, 255, 0.12));
+  color: var(--text-primary, #ffffff);
+}
+
+/* Form Body */
+.mcp-modal-body {
+  padding: 20px 22px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: calc(90vh - 170px);
+}
+
+.mcp-modal-error-banner {
+  background-color: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #DC2626;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mcp-form-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.mcp-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.mcp-form-field.flex-1 {
+  flex: 1;
+}
+
+.mcp-form-field label {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--text-secondary, #a1a1aa);
+}
+
+.mcp-form-field input,
+.mcp-form-field select,
+.mcp-form-field textarea {
+  background-color: var(--input-bg, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--input-border, rgba(255, 255, 255, 0.08));
+  border-radius: 10px;
+  padding: 9px 12px;
+  color: var(--text-primary, #ffffff);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.mcp-form-field input:focus,
+.mcp-form-field select:focus,
+.mcp-form-field textarea:focus {
+  border-color: var(--input-border-focus, rgba(255, 255, 255, 0.25));
+  background-color: var(--input-bg-focus, rgba(255, 255, 255, 0.08));
+}
+
+.mcp-form-field input::placeholder,
+.mcp-form-field textarea::placeholder {
+  color: var(--input-placeholder, rgba(255, 255, 255, 0.3));
+}
+
+.mcp-form-field select {
+  cursor: pointer;
+}
+
+.mcp-form-field select option {
+  background-color: var(--bg-surface, #1a1a1a);
+  color: var(--text-primary, #ffffff);
+}
+
+/* Env Section */
+.mcp-env-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: var(--card-bg, rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.05));
+  padding: 12px 14px;
+  border-radius: 14px;
+}
+
+.mcp-env-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mcp-env-header label {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--text-secondary, #a1a1aa);
+}
+
+.mcp-add-env-btn {
+  background-color: var(--btn-bg, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  color: var(--text-primary, #e2e2e6);
+  border-radius: 9999px;
+  padding: 3px 10px;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.mcp-add-env-btn:hover {
+  background-color: var(--btn-bg-hover, rgba(255, 255, 255, 0.12));
+  color: var(--text-primary, #ffffff);
+}
+
+.mcp-env-empty {
+  padding: 10px;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--text-muted, #71717a);
+}
+
+.mcp-env-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mcp-env-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.env-key-inp {
+  flex: 1;
+  background-color: var(--input-bg, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--input-border, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-primary, #ffffff);
+  outline: none;
+}
+
+.env-val-inp {
+  flex: 1.4;
+  background-color: var(--input-bg, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--input-border, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-primary, #ffffff);
+  outline: none;
+}
+
+.mcp-env-del-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #71717a);
+  padding: 6px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.mcp-env-del-btn:hover {
+  color: #DC2626;
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+/* Toggle Checkbox Row */
+.mcp-toggle-row {
+  display: flex;
+  align-items: center;
+}
+
+.mcp-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-secondary, #d1d5db);
+  cursor: pointer;
+  user-select: none;
+}
+
+.mcp-toggle-label input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: #3b82f6;
+  width: 15px;
+  height: 15px;
+}
+
+/* JSON Editor */
+.mcp-json-editor-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mcp-json-textarea {
+  font-family: var(--font-mono, monospace) !important;
+  font-size: 12px !important;
+  line-height: 1.5;
+  color: var(--code-text, var(--text-primary, #e2e2e6)) !important;
+  background-color: var(--code-bg, var(--bg-surface, #101010)) !important;
+  border: 1px solid var(--code-border, var(--border-card, rgba(255, 255, 255, 0.08))) !important;
+  resize: vertical;
+}
+
+/* Modal Footer */
+.mcp-modal-footer {
+  padding: 16px 22px;
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+  background-color: var(--card-bg, rgba(255, 255, 255, 0.02));
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.mcp-modal-cancel-btn {
+  background: transparent;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: 9999px;
+  color: var(--text-muted, #8e8e93);
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mcp-modal-cancel-btn:hover {
+  background-color: var(--btn-bg-hover, rgba(255, 255, 255, 0.06));
+  color: var(--text-primary, #ffffff);
+}
+
+.mcp-modal-submit-btn {
+  background-color: var(--btn-primary-bg, #ffffff);
+  border: none;
+  border-radius: 9999px;
+  color: var(--btn-primary-text, #000000);
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.mcp-modal-submit-btn:hover {
+  background-color: var(--btn-primary-hover-bg, #e5e5e5);
+}
+
+.mcp-modal-submit-btn:disabled,
+.mcp-modal-cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

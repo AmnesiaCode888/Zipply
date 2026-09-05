@@ -1,0 +1,213 @@
+/* ══════════════════════════════════════════════════════════════════════════════
+   SUBAGENT ROUND — STRICT DESIGN TOKEN CONFORMANCE (NO BLUE TINTS)
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.subagent-round-root {
+  /* Inherits .tool-round-container */
+}
+
+/* ─── 1. BOT ICONS & HEADERS ────────────────────────────────────────────────── */
+.subagent-bot-icon {
+  color: var(--text-muted, #858585);
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.worked-summary-btn:hover .subagent-bot-icon,
+.worked-summary-btn.expanded .subagent-bot-icon {
+  color: var(--text-primary, #FFFFFF);
+}
+
+.subagent-header-agent-name {
+  color: var(--text-primary, #FFFFFF);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.subagent-streaming-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.subagent-streaming-agent-name {
+  color: var(--text-primary, #FFFFFF);
+  font-weight: 500;
+  font-size: 13.5px;
+  flex-shrink: 0;
+}
+
+.subagent-total-steps-badge {
+  font-size: 12px;
+  color: var(--text-muted, #858585);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* ─── 2. BODY & SWARM TABS (ROUNDED PILLS, NO BORDERS) ─────────────────────── */
+.subagent-body-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.subagent-swarm-tabbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 3px 0 4px 0;
+  overflow-x: auto;
+}
+
+.subagent-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  background: var(--pill-bg, rgba(255, 255, 255, 0.06));
+  border: none;
+  color: var(--pill-text, #D1D1D6);
+  font-family: var(--font-custom-family, 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  transition: background 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+
+.subagent-tab-btn:hover {
+  background: var(--pill-bg-hover, rgba(255, 255, 255, 0.12));
+  color: var(--text-primary, #FFFFFF);
+}
+
+.subagent-tab-btn.active {
+  background: var(--btn-bg-active, rgba(255, 255, 255, 0.18));
+  color: var(--text-primary, #FFFFFF);
+  font-weight: 550;
+}
+
+.subagent-tab-count {
+  font-size: 11px;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.subagent-tab-spin {
+  animation: spinLoader 1s linear infinite;
+  color: var(--text-muted, #858585);
+}
+
+/* ─── 3. TASK / PROMPT (ROUNDED CAPSULE PILL, NO BORDERS) ───────────────────── */
+.subagent-task-line {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 2px 0 4px 0;
+  padding: 4px 12px;
+  background: var(--pill-bg, rgba(255, 255, 255, 0.06));
+  border: none;
+  border-radius: 9999px;
+  max-width: 100%;
+  box-sizing: border-box;
+  align-self: flex-start;
+}
+
+.subagent-task-prefix {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #858585);
+  flex-shrink: 0;
+}
+
+.subagent-task-text {
+  font-size: 12.5px;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.65));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── 4. STEPS LIST (NO LEFT VERTICAL LINE) ────────────────────────────────── */
+.subagent-steps-list {
+  border-left: none !important;
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+  gap: 2px;
+}
+
+/* ─── 5. SUBAGENT ANSWER CARD (ROUNDED, NO BORDERS) ────────────────────────── */
+.subagent-answer-card {
+  display: flex;
+  flex-direction: column;
+  margin: 6px 0 2px 0;
+  background: var(--card-bg, rgba(255, 255, 255, 0.04));
+  border: none;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.subagent-answer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 4px 12px;
+  background: transparent;
+  border-bottom: none;
+}
+
+.subagent-answer-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-muted, #858585);
+}
+
+.subagent-answer-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--btn-bg, rgba(255, 255, 255, 0.06));
+  border: none;
+  border-radius: 9999px;
+  color: var(--text-muted, #858585);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 3px 9px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.subagent-answer-copy:hover {
+  color: var(--text-primary, #FFFFFF);
+  background: var(--btn-bg-hover, rgba(255, 255, 255, 0.12));
+}
+
+.subagent-answer-content {
+  padding: 4px 12px 12px 12px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-primary, #FFFFFF);
+  user-select: text;
+}
+
+.subagent-answer-content p {
+  margin: 4px 0;
+}
+
+.subagent-answer-content p:first-child {
+  margin-top: 0;
+}
+
+.subagent-answer-content p:last-child {
+  margin-bottom: 0;
+}

@@ -1,0 +1,489 @@
+/* ══════════════════════════════════════════════════════════════════════════════
+   TOOL ROUND — BUTTER-SMOOTH ACCORDIONS & PERFECT GEOMETRIC ALIGNMENT
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.tool-round-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin: 3px 0;
+  width: 100%;
+  user-select: none;
+}
+
+/* ─── 1. INTERACTIVE STREAMING BAR ─────────────────────────────────────────── */
+.streaming-bar-interactive {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.streaming-bar-interactive:hover .streaming-expand-chevron {
+  color: var(--text-primary, #FFFFFF);
+}
+
+.streaming-expand-chevron {
+  color: var(--text-muted, #71717A);
+  margin-left: 8px;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+/* ─── 2. 3D CYLINDER SLOT-MACHINE REEL ──────────────────────────────────────── */
+.slot-machine-viewport {
+  position: relative;
+  height: 26px;
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  perspective: 600px;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+}
+
+.reel-item {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary, #D4D4D8);
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13.5px;
+  font-weight: 450;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  transform-origin: 50% 50%;
+  backface-visibility: hidden;
+}
+
+/* Static Current Item */
+.reel-item.reel-current {
+  transform: translateY(0) rotateX(0deg) scale(1);
+  opacity: 1;
+  filter: blur(0px);
+}
+
+/* Exiting Item - Rolls UP and tilts into upper curvature */
+.reel-item.reel-exit {
+  animation: reelRollExit 0.38s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+  pointer-events: none;
+}
+
+@keyframes reelRollExit {
+  0% {
+    transform: translateY(0) rotateX(0deg) scale(1);
+    opacity: 1;
+    filter: blur(0px);
+  }
+  100% {
+    transform: translateY(-110%) rotateX(45deg) scale(0.92);
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+
+/* Entering Item - Rolls UP from bottom curvature */
+.reel-item.reel-enter {
+  animation: reelRollEnter 0.38s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+
+@keyframes reelRollEnter {
+  0% {
+    transform: translateY(110%) rotateX(-45deg) scale(0.92);
+    opacity: 0;
+    filter: blur(2px);
+  }
+  100% {
+    transform: translateY(0) rotateX(0deg) scale(1);
+    opacity: 1;
+    filter: blur(0px);
+  }
+}
+
+.step-icon-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted, #8E8E93);
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.step-type-icon {
+  flex-shrink: 0;
+  color: var(--text-muted, #8E8E93);
+}
+
+.streaming-spin-icon {
+  color: var(--text-muted, #8E8E93);
+  animation: spinLoader 1s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spinLoader {
+  to { transform: rotate(360deg); }
+}
+
+.streaming-text {
+  color: var(--text-primary, #D4D4D8);
+}
+
+.streaming-live-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-primary, #D4D4D8);
+}
+
+/* ─── 3. COMPLETED "WORKED FOR Xs ⌄" SUMMARY ────────────────────────────────── */
+.worked-summary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px 3px 0;
+  margin: 0;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #8E8E93);
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13.5px;
+  font-weight: 450;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  outline: none;
+  transition: color 0.15s ease;
+  max-width: 100%;
+  text-align: left;
+}
+
+.worked-summary-btn:hover {
+  color: var(--text-primary, #FFFFFF);
+}
+
+.worked-summary-btn.expanded {
+  color: var(--text-primary, #E4E4E7);
+}
+
+.worked-summary-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.worked-summary-time {
+  color: var(--text-muted, #8E8E93);
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.worked-summary-btn:hover .worked-summary-time,
+.worked-summary-btn.expanded .worked-summary-time {
+  color: var(--text-secondary, #D4D4D8);
+}
+
+.worked-summary-dot {
+  color: var(--text-muted, #52525B);
+  font-weight: 600;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.worked-summary-desc {
+  color: var(--text-secondary, #A1A1AA);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+
+.worked-summary-btn:hover .worked-summary-desc,
+.worked-summary-btn.expanded .worked-summary-desc {
+  color: var(--text-primary, #FFFFFF);
+}
+
+.worked-chevron {
+  color: var(--text-muted, #71717A);
+  flex-shrink: 0;
+  transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s ease;
+}
+
+.worked-summary-btn:hover .worked-chevron {
+  color: var(--text-primary, #D4D4D8);
+}
+
+.worked-chevron.open {
+  transform: rotate(180deg);
+  color: var(--text-primary, #FFFFFF);
+}
+
+/* ─── 4. SMOOTH CSS GRID ACCORDION (MAIN LIST) ──────────────────────────────── */
+/* contain: layout paint keeps the grid-row animation from forcing a full-page
+   relayout on every frame — only the accordion subtree is re-laid out. */
+.accordion-grid {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  width: 100%;
+  contain: layout;
+}
+
+.accordion-grid.open {
+  grid-template-rows: 1fr;
+}
+
+.accordion-content {
+  overflow: hidden;
+  min-height: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  contain: layout paint style;
+}
+
+.accordion-grid.open .accordion-content {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.worked-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 3px;
+  margin-left: 2px;
+  padding-left: 8px;
+  border-left: 1.5px solid var(--border-card, #27272A);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.worked-step-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.worked-step-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 0;
+  border-radius: 4px;
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px;
+  color: var(--text-secondary, #A1A1AA);
+  letter-spacing: -0.01em;
+  transition: color 0.12s ease;
+  outline: none;
+  background: transparent;
+  border: none;
+  width: 100%;
+}
+
+.worked-step-row.has-details:hover {
+  color: var(--text-primary, #FFFFFF);
+  cursor: pointer;
+}
+
+.worked-step-row.detail-open {
+  color: var(--text-primary, #FFFFFF);
+}
+
+.worked-step-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.worked-step-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.worked-step-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.step-stats-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.step-stat-add {
+  color: #059669;
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.step-stat-del {
+  color: #DC2626;
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.step-detail-arrow {
+  color: var(--text-muted, #71717A);
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s ease;
+}
+
+.worked-step-row:hover .step-detail-arrow {
+  color: var(--text-primary, #FFFFFF);
+}
+
+.step-detail-arrow.open {
+  transform: rotate(90deg);
+  color: var(--text-primary, #FFFFFF);
+}
+
+/* ─── 5. SMOOTH CSS GRID ACCORDION (INDIVIDUAL STEP DETAIL) ─────────────────── */
+.detail-accordion-grid {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  width: 100%;
+  contain: layout;
+}
+
+.detail-accordion-grid.open {
+  grid-template-rows: 1fr;
+}
+
+.detail-accordion-content {
+  overflow: hidden;
+  min-height: 0;
+  opacity: 0;
+  transform: translateY(-3px);
+  transition: opacity 0.18s ease, transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  contain: layout paint style;
+}
+
+.detail-accordion-grid.open .detail-accordion-content {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.worked-step-detail-body {
+  margin: 2px 0 6px 24px;
+  width: calc(100% - 24px);
+  box-sizing: border-box;
+}
+
+.step-thought-text {
+  padding: 2px 0 4px 4px;
+  color: var(--text-muted, #8E8E93);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Markdown formatting inside thought blocks — slightly dimmed palette */
+.thought-markdown .msg-p {
+  color: var(--text-muted, #8E8E93);
+  font-size: 13px;
+  margin: 0 0 5px 0;
+}
+.thought-markdown .msg-p:last-child {
+  margin-bottom: 0;
+}
+.thought-markdown .msg-h1,
+.thought-markdown .msg-h2,
+.thought-markdown .msg-h3,
+.thought-markdown .msg-h4 {
+  color: var(--text-secondary, #A1A1AA);
+  font-size: 13px;
+  font-weight: 600;
+  margin: 6px 0 3px 0;
+}
+.thought-markdown .msg-list,
+.thought-markdown .msg-olist {
+  padding-left: 16px;
+  margin: 3px 0 5px 0;
+  gap: 2px;
+}
+.thought-markdown .msg-li,
+.thought-markdown .msg-oli {
+  color: var(--text-muted, #8E8E93);
+  font-size: 13px;
+}
+.thought-markdown .msg-inline-code {
+  font-size: 12px;
+  background: var(--pill-bg, rgba(255,255,255,0.05));
+  color: var(--text-secondary, #A1A1AA);
+  border-color: var(--border-subtle, rgba(255,255,255,0.04));
+}
+.thought-markdown .msg-code-container {
+  margin: 5px 0 7px 0;
+}
+.thought-markdown .msg-code-pre {
+  font-size: 12px;
+  color: var(--text-muted, #8E8E93);
+}
+.thought-markdown .msg-blockquote {
+  color: var(--text-muted, #71717A);
+  border-left-color: var(--border-hover, #52525B);
+}
+.thought-markdown .msg-hr {
+  border-top-color: var(--border-subtle, #27272A);
+}
+.thought-markdown .md-bold {
+  color: var(--text-secondary, #A1A1AA);
+}
+.thought-markdown .md-em {
+  color: var(--text-muted, #8E8E93);
+}
+
+
+/* ─── Deep Thinking Badge ────────────────────────────────────────────────────── */
+.worked-step-name.is-deep-thought {
+  color: #C4B5FD;
+}
+
+.worked-step-row:hover .worked-step-name.is-deep-thought,
+.worked-step-row.detail-open .worked-step-name.is-deep-thought {
+  color: #DDD6FE;
+}
+
+.deep-thought-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: #A78BFA;
+  background: rgba(139, 92, 246, 0.15);
+  border: none;
+  flex-shrink: 0;
+  line-height: 1.4;
+  transition: background 0.15s ease, color 0.15s ease;
+  user-select: none;
+}
+
+.worked-step-row:hover .deep-thought-badge {
+  background: rgba(139, 92, 246, 0.2);
+  color: #C4B5FD;
+}
+

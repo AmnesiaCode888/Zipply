@@ -1,0 +1,228 @@
+.titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  min-height: 60px;
+  background-color: var(--bg-primary, #0D0D0D);
+  padding: 0 18px;
+  user-select: none;
+  -webkit-app-region: drag;
+  z-index: 1000;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.top-nav-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  -webkit-app-region: no-drag;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  opacity: 1;
+}
+
+.top-nav-left.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-10px);
+}
+
+.top-nav-left.chat-mode {
+  gap: 12px;
+}
+
+.chat-titlebar-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 420px;
+  user-select: none;
+}
+
+
+.chat-title-text {
+  color: var(--text-primary, #FFFFFF);
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-titlebar-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background-color: var(--btn-bg, rgba(255, 255, 255, 0.06));
+  border: none;
+  border-radius: 6px;
+  color: var(--text-muted, #71717A);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  margin-left: 2px;
+  transition: all 0.15s ease;
+}
+
+.chat-titlebar-delete-btn:hover {
+  background-color: rgba(239, 68, 68, 0.16);
+  color: #EF4444;
+}
+
+.chat-titlebar-delete-btn:active {
+  transform: scale(0.94);
+}
+
+.settings-close-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  background-color: var(--btn-bg, rgba(255, 255, 255, 0.08));
+  border: none;
+  border-radius: 9999px;
+  color: var(--text-secondary, #A1A1AA);
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  margin-left: 8px;
+  transition: all 0.15s ease;
+}
+
+.settings-close-pill:hover {
+  background-color: var(--btn-bg-hover, rgba(255, 255, 255, 0.14));
+  color: var(--text-primary, #FFFFFF);
+}
+
+.settings-close-pill:active {
+  transform: scale(0.96);
+}
+
+.new-chat-pill {
+  height: 41px;
+  padding: 0 20px;
+  background-color: var(--btn-bg, rgba(255, 255, 255, 0.08));
+  border: none;
+  border-radius: 9999px;
+  color: var(--text-secondary, #8E8E93);
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 15.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-rendering: geometricPrecision;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.new-chat-pill:hover {
+  background-color: var(--btn-bg-hover, rgba(255, 255, 255, 0.14));
+  color: var(--text-primary, #FFFFFF);
+}
+
+.new-chat-pill:active {
+  transform: scale(0.96);
+}
+
+.sidebar-toggle-btn {
+  width: 41px;
+  height: 41px;
+  border-radius: 50%;
+  background-color: var(--btn-bg, rgba(255, 255, 255, 0.08));
+  border: none;
+  color: var(--text-muted, #8E8E93);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.sidebar-toggle-btn:hover {
+  background-color: var(--btn-bg-hover, rgba(255, 255, 255, 0.14));
+  color: var(--text-primary, #FFFFFF);
+}
+
+.sidebar-toggle-btn.active {
+  background-color: var(--btn-bg-hover, rgba(255, 255, 255, 0.14));
+  color: var(--text-primary, #FFFFFF);
+}
+
+.sidebar-toggle-btn:active {
+  transform: scale(0.94);
+}
+
+.titlebar-drag-spacer {
+  flex: 1;
+  height: 100%;
+  -webkit-app-region: drag;
+}
+
+.window-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.control-btn {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: transform 0.15s ease, filter 0.15s ease, opacity 0.15s ease;
+  position: relative;
+  -webkit-app-region: no-drag;
+}
+
+.control-btn svg {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  width: 7px;
+  height: 7px;
+  color: rgba(0, 0, 0, 0.7);
+}
+
+.window-controls:hover .control-btn svg {
+  opacity: 0.85;
+}
+
+.control-btn:hover {
+  filter: brightness(1.15);
+  transform: scale(1.12);
+}
+
+.control-btn:active {
+  transform: scale(0.92);
+  filter: brightness(0.85);
+}
+
+/* Green - Maximize / Restore */
+.control-btn.btn-green {
+  background-color: #27C93F;
+}
+
+/* Yellow - Minimize */
+.control-btn.btn-yellow {
+  background-color: #FFBD2E;
+}
+
+/* Red - Close */
+.control-btn.btn-red {
+  background-color: #FF5F56;
+}

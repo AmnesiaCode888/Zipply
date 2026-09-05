@@ -1,0 +1,288 @@
+.skill-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+  animation: skillModalFadeIn 0.15s ease-out;
+}
+
+@keyframes skillModalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.skill-modal-container {
+  background-color: #1a1a1a;
+  border: none;
+  border-radius: 24px;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  animation: skillModalSlideUp 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes skillModalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.skill-modal-header {
+  padding: 18px 24px;
+  border-bottom: 1px solid #242424;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #1a1a1a;
+}
+
+.skill-modal-title-wrap h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.skill-modal-close-btn {
+  background: transparent;
+  border: none;
+  color: #8e8e93;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.skill-modal-close-btn:hover {
+  background-color: #262626;
+  color: #ffffff;
+}
+
+.skill-modal-form {
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.skill-modal-error {
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #ef4444;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.skill-modal-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.skill-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skill-modal-field label {
+  font-size: 12.5px;
+  font-weight: 550;
+  color: #d1d5db;
+}
+
+.skill-modal-hint {
+  font-size: 11.5px;
+  color: var(--text-muted, #858585);
+  line-height: 1.35;
+}
+
+.skill-modal-field input[type='text'] {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 14px;
+  color: #ffffff;
+  font-size: 13.5px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.skill-modal-field input[type='text']::placeholder {
+  color: var(--input-placeholder, rgba(255, 255, 255, 0.4));
+}
+
+.skill-modal-field input[type='text']:focus {
+  border-color: rgba(255, 255, 255, 0.22);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.skill-modal-field input[type='text']:disabled {
+  background-color: rgba(255, 255, 255, 0.03);
+  color: #71717a;
+  cursor: not-allowed;
+}
+
+.skill-type-toggle-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.skill-type-btn {
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  color: #8e8e93;
+}
+
+.skill-type-btn.active {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.skill-type-btn-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.skill-type-btn-content strong {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.skill-type-btn-content span {
+  font-size: 11.5px;
+  color: #71717a;
+  line-height: 1.3;
+}
+
+.skill-instructions-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.skill-format-badge {
+  font-size: 11px;
+  color: #71717a;
+  background-color: rgba(255, 255, 255, 0.06);
+  border: none;
+  padding: 2px 8px;
+  border-radius: 9999px;
+}
+
+.skill-modal-textarea {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: #ffffff;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 160px;
+  outline: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.skill-modal-textarea::placeholder {
+  color: var(--input-placeholder, rgba(255, 255, 255, 0.4));
+}
+
+.skill-modal-textarea:focus {
+  border-color: rgba(255, 255, 255, 0.22);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.skill-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+  padding-top: 16px;
+  border-top: 1px solid #242424;
+}
+
+.skill-btn-secondary {
+  background-color: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #8e8e93;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.skill-btn-secondary:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.skill-btn-primary {
+  background-color: #ffffff;
+  border: none;
+  color: #000000;
+  padding: 8px 20px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 550;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.skill-btn-primary:hover:not(:disabled) {
+  background-color: #e5e5e5;
+}
+
+.skill-btn-primary:disabled,
+.skill-btn-secondary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

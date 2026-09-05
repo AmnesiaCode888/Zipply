@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https: http:; media-src 'self' data: blob: https:; connect-src 'self' https: http: ws: wss: data: blob:;" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="/icon.png" />
+    <title>Zipply</title>
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('zipply_appearance_config') ||
+                      localStorage.getItem('zipple_appearance_config') ||
+                      localStorage.getItem('clickcoder_appearance_config') ||
+                      localStorage.getItem('clickcode_appearance_config') ||
+                      localStorage.getItem('click_appearance_config');
+          if (saved) {
+            var cfg = JSON.parse(saved);
+            if (cfg.theme) document.documentElement.setAttribute('data-theme', cfg.theme);
+            if (cfg.accentColor) document.documentElement.setAttribute('data-accent', cfg.accentColor);
+            if (cfg.compactMode) document.documentElement.setAttribute('data-compact', 'true');
+            if (cfg.fontSize) document.documentElement.style.setProperty('--app-font-size-base', cfg.fontSize + 'px');
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

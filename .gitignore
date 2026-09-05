@@ -1,0 +1,15 @@
+node_modules
+dist
+dist-electron
+out
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+*.local
+*.log
+.env
+.env.*
+!.env.example
+.zipply
+*.tmp
+temp_*
