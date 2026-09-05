@@ -111,6 +111,26 @@ export class FileTool extends ToolBase {
     return path.normalize(path.join(workspace, targetPath))
   }
 
+  private _validateSafePath(targetPath: string, blackboard: Blackboard): string | null {
+    const config = blackboard?.getArtifact('config') as { allowDangerousOperations?: boolean } | undefined
+    if (config?.allowDangerousOperations === true) return null
+
+    const normalized = path.normalize(targetPath).toLowerCase().replace(/\\/g, '/')
+    const sensitivePatterns = [
+      /[/\\]\.(ssh|gnupg|aws|azure|gcloud)($|[/\\])/i,
+      /(^|[/\\])etc[/\\](shadow|passwd|sudoers)($|[/\\])/i,
+      /[/\\]windows[/\\](system32|syswow64)[/\\](config|drivers[/\\]etc[/\\]hosts)($|[/\\])/i,
+      /[/\\]\.(bashrc|bash_profile|zshrc|profile)($|[/\\])/i
+    ]
+
+    for (const pattern of sensitivePatterns) {
+      if (pattern.test(normalized)) {
+        return `Blocked access to sensitive system path "${targetPath}". To allow this, enable allowDangerousOperations.`
+      }
+    }
+    return null
+  }
+
   async execute(
     argumentsJson: string,
     blackboard: Blackboard,
@@ -128,6 +148,14 @@ export class FileTool extends ToolBase {
     if (!action) return { formattedContent: 'Error: action parameter is required.' }
 
     const targetPath = this._getResolvedPath(args.path, blackboard)
+    const targetError = this._validateSafePath(targetPath, blackboard)
+    if (targetError) return { formattedContent: targetError }
+
+    if (args.dest_path) {
+      const destPath = this._getResolvedPath(args.dest_path, blackboard)
+      const destError = this._validateSafePath(destPath, blackboard)
+      if (destError) return { formattedContent: destError }
+    }
 
     try {
       switch (action) {

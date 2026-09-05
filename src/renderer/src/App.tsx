@@ -6,6 +6,7 @@ import { ChatView } from './components/ChatView'
 import { NotesView } from './components/notes/NotesView'
 import { SkillsView } from './components/skills/SkillsView'
 import { SettingsView } from './components/settings/SettingsView'
+import { RightSidePanel } from './components/RightSidePanel'
 import { useChatSession } from './hooks/useChatSession'
 import { useAppearance } from './hooks/useAppearance'
 import { AiSettingsProvider, useAiSettingsContext } from './hooks/AiSettingsContext'
@@ -17,6 +18,8 @@ const AppInner: React.FC = () => {
   useAppearance()
   const { config } = useAiSettingsContext()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(false)
+  const [rightPanelTab, setRightPanelTab] = useState<'terminal' | 'files'>('terminal')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTab>('models')
   const [activeNavTab, setActiveNavTab] = useState<'dialogs' | 'notes' | 'skills'>('dialogs')
@@ -38,6 +41,46 @@ const AppInner: React.FC = () => {
   const handleToggleSidebar = (): void => {
     setIsSidebarOpen((prev) => !prev)
   }
+
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('zipply_sidebar_width')
+      if (saved) {
+        const val = parseInt(saved, 10)
+        if (!isNaN(val) && val >= 200 && val <= 460) return val
+      }
+    } catch {}
+    return 260
+  })
+
+  const handleResizeSidebar = useCallback((newWidth: number) => {
+    setSidebarWidth(newWidth)
+    try {
+      localStorage.setItem('zipply_sidebar_width', String(newWidth))
+    } catch {}
+  }, [])
+
+  const [rightPanelWidth, setRightPanelWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('zipply_right_panel_width')
+      if (saved) {
+        const val = parseInt(saved, 10)
+        if (!isNaN(val) && val >= 300 && val <= 1200) return val
+      }
+    } catch {}
+    return 440
+  })
+
+  const handleResizeRightPanel = useCallback((newWidth: number) => {
+    setRightPanelWidth(newWidth)
+    try {
+      localStorage.setItem('zipply_right_panel_width', String(newWidth))
+    } catch {}
+  }, [])
+
+  const handleToggleRightPanel = useCallback((): void => {
+    setIsRightPanelOpen((prev) => !prev)
+  }, [])
 
   const handleOpenSettings = useCallback((tab: SettingsTab = 'models'): void => {
     setIsSettingsOpen(true)
@@ -174,10 +217,29 @@ const AppInner: React.FC = () => {
         return
       }
 
-      // Escape -> Close settings if open
-      if (e.key === 'Escape' && isSettingsOpen) {
+      // Ctrl+` (Backquote / ё) or Ctrl+J -> Toggle Right Terminal Panel
+      if (
+        isCmdOrCtrl &&
+        !e.shiftKey &&
+        (code === 'Backquote' || key === '`' || key === 'ё' || code === 'KeyJ' || key === 'j' || key === 'о')
+      ) {
         e.preventDefault()
-        setIsSettingsOpen(false)
+        handleToggleRightPanel()
+        return
+      }
+
+      // Escape -> Close settings or right panel
+      if (e.key === 'Escape') {
+        if (isSettingsOpen) {
+          e.preventDefault()
+          setIsSettingsOpen(false)
+          return
+        }
+        if (isRightPanelOpen) {
+          e.preventDefault()
+          setIsRightPanelOpen(false)
+          return
+        }
       }
     }
 
@@ -185,7 +247,7 @@ const AppInner: React.FC = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isSettingsOpen, activeNavTab, handleNewChat, handleToggleSidebar, handleSelectNavTab])
+  }, [isSettingsOpen, isRightPanelOpen, activeNavTab, handleNewChat, handleToggleSidebar, handleToggleRightPanel, handleSelectNavTab])
 
   return (
     <div className="app-container">
@@ -195,6 +257,8 @@ const AppInner: React.FC = () => {
         activeChatId={activeChatId}
         activeNavTab={activeNavTab}
         selectedNotesCategory={selectedNotesCategory}
+        width={sidebarWidth}
+        onResize={handleResizeSidebar}
         onSelectNavTab={handleSelectNavTab}
         onSelectNotesCategory={setSelectedNotesCategory}
         onSelectChat={handleSelectChat}
@@ -216,7 +280,9 @@ const AppInner: React.FC = () => {
           isSettingsOpen={isSettingsOpen}
           activeSettingsTab={activeSettingsTab}
           activeNavTab={activeNavTab}
+          isRightPanelOpen={isRightPanelOpen}
           onToggleSidebar={handleToggleSidebar}
+          onToggleRightPanel={handleToggleRightPanel}
           onNewChat={
             activeNavTab === 'notes'
               ? handleNewNote
@@ -259,6 +325,15 @@ const AppInner: React.FC = () => {
           )}
         </main>
       </div>
+      <RightSidePanel
+        isOpen={isRightPanelOpen}
+        activeTab={rightPanelTab}
+        onSelectTab={setRightPanelTab}
+        panelWidth={rightPanelWidth}
+        onResize={handleResizeRightPanel}
+        onClose={() => setIsRightPanelOpen(false)}
+        activeProject={activeChat?.project || null}
+      />
     </div>
   )
 }

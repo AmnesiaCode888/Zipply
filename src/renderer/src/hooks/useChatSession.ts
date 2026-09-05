@@ -59,10 +59,12 @@ function getStoredSessions(): ChatSession[] {
   return []
 }
 
-function saveSessionsToStorage(sessions: ChatSession[]): void {
+function saveSessionsToStorage(sessions: ChatSession[], debounceFileMs = 1000): void {
+  if (!Array.isArray(sessions)) return
+
   // 1. Persist full sessions to rock-solid OS filesystem store (protected against updates and cache wipes)
   if (window.api?.storage?.setStore) {
-    window.api.storage.setStore('chats', sessions, 1000).catch((err) => {
+    window.api.storage.setStore('chats', sessions, debounceFileMs).catch((err) => {
       console.warn('[useChatSession] Failed to persist chats to file storage:', err)
     })
   }
@@ -314,6 +316,14 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
   const roundStartTimeRef = useRef<number>(Date.now())
   const chatsRef = useRef<ChatSession[]>(chats)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isHydratedRef = useRef<boolean>(false)
+  const wasStreamingRef = useRef<boolean>(false)
+  const pendingTokensRef = useRef<string>('')
+  const tokenFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingReasoningRef = useRef<string>('')
+  const reasoningFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const streamingChatIdRef = useRef<string | null>(null)
+
   // Keep a always-current reference to config so callbacks don't go stale
   const configRef = useRef<AiConfig | undefined>(config)
   useEffect(() => {
@@ -322,42 +332,73 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
 
   // Hydrate full sessions and images from persistent file storage or IndexedDB on initial mount
   useEffect(() => {
-    const hydrate = async () => {
-      // 1. Try loading from persistent OS file storage
-      if (window.api?.storage?.getStore) {
-        try {
-          const fileSessions = await window.api.storage.getStore<ChatSession[]>('chats')
-          if (Array.isArray(fileSessions) && fileSessions.length > 0) {
-            const valid = fileSessions.filter((c) => c && c.id && !DUMMY_CHAT_IDS.has(c.id))
-            if (valid.length > 0) {
-              setChats(valid)
-              chatsRef.current = valid
-              return
-            }
-          }
-        } catch (e) {
-          console.warn('[useChatSession] Error hydrating from file storage:', e)
-        }
-      }
+    let isCancelled = false
 
-      // 2. Fallback to IndexedDB
+    const hydrate = async () => {
       try {
-        const dbSessions = await dbLoadSessions()
-        if (dbSessions && dbSessions.length > 0) {
-          const valid = dbSessions.filter((c) => c && c.id && !DUMMY_CHAT_IDS.has(c.id))
-          setChats(valid)
-          chatsRef.current = valid
-          // Backfill into file store
-          if (window.api?.storage?.setStore) {
-            window.api.storage.setStore('chats', valid, 0).catch(() => {})
+        let loadedChats: ChatSession[] | null = null
+
+        // 1. Try loading from persistent OS file storage
+        if (window.api?.storage?.getStore) {
+          try {
+            const fileSessions = await window.api.storage.getStore<ChatSession[]>('chats')
+            if (Array.isArray(fileSessions) && fileSessions.length > 0) {
+              const valid = fileSessions.filter((c) => c && c.id && !DUMMY_CHAT_IDS.has(c.id))
+              if (valid.length > 0) {
+                loadedChats = valid
+              }
+            }
+          } catch (e) {
+            console.warn('[useChatSession] Error hydrating from file storage:', e)
           }
         }
-      } catch (err) {
-        console.warn('[useChatSession] Error hydrating from IndexedDB:', err)
+
+        // 2. Fallback to IndexedDB
+        if (!loadedChats || loadedChats.length === 0) {
+          try {
+            const dbSessions = await dbLoadSessions()
+            if (dbSessions && dbSessions.length > 0) {
+              const valid = dbSessions.filter((c) => c && c.id && !DUMMY_CHAT_IDS.has(c.id))
+              if (valid.length > 0) {
+                loadedChats = valid
+              }
+            }
+          } catch (err) {
+            console.warn('[useChatSession] Error hydrating from IndexedDB:', err)
+          }
+        }
+
+        // 3. Fallback to localStorage if still empty
+        if (!loadedChats || loadedChats.length === 0) {
+          const localSessions = getStoredSessions()
+          if (localSessions.length > 0) {
+            loadedChats = localSessions
+          }
+        }
+
+        if (isCancelled) return
+
+        if (loadedChats && loadedChats.length > 0) {
+          setChats(loadedChats)
+          chatsRef.current = loadedChats
+          // Backfill into file store and IndexedDB if needed
+          if (window.api?.storage?.setStore) {
+            window.api.storage.setStore('chats', loadedChats, 0).catch(() => {})
+          }
+          dbSaveSessions(loadedChats).catch(() => {})
+        }
+      } finally {
+        if (!isCancelled) {
+          isHydratedRef.current = true
+        }
       }
     }
 
     hydrate()
+
+    return () => {
+      isCancelled = true
+    }
   }, [])
 
   // Keep refs synced
@@ -365,35 +406,41 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
     activeChatIdRef.current = activeChatId
   }, [activeChatId])
 
-  // Persist sessions DEBOUNCED. Saving synchronously on every state change would
-  // JSON.stringify the entire history to localStorage on EVERY streaming token
-  // (dozens of times per second) and freeze the UI thread.
+  // Persist sessions DEBOUNCED. Only after hydration is complete to prevent overwriting disk storage with empty state.
   useEffect(() => {
     chatsRef.current = chats
+    if (!isHydratedRef.current) return
+
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null
-      saveSessionsToStorage(chatsRef.current)
+      if (isHydratedRef.current) {
+        saveSessionsToStorage(chatsRef.current, 1000)
+      }
     }, 800)
   }, [chats])
 
-  // Flush pending changes immediately when streaming stops (done/error/cancel)
+  // Flush pending changes immediately when streaming transitions from running to stopped
   useEffect(() => {
-    if (isStreaming) return
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current)
-      saveTimeoutRef.current = null
+    if (wasStreamingRef.current && !isStreaming) {
+      if (isHydratedRef.current) {
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current)
+          saveTimeoutRef.current = null
+        }
+        saveSessionsToStorage(chatsRef.current, 0)
+      }
     }
-    saveSessionsToStorage(chatsRef.current)
+    wasStreamingRef.current = isStreaming
   }, [isStreaming])
 
   // Never lose the tail of a conversation if the window closes before the debounce fires
   useEffect(() => {
     const flushOnClose = (): void => {
-      if (saveTimeoutRef.current) {
+      if (isHydratedRef.current && saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current)
         saveTimeoutRef.current = null
-        saveSessionsToStorage(chatsRef.current)
+        saveSessionsToStorage(chatsRef.current, 0)
       }
     }
     window.addEventListener('beforeunload', flushOnClose)
@@ -417,7 +464,18 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
   }, [])
 
   const deleteChat = useCallback((chatId: string) => {
-    if (activeChatIdRef.current === chatId) {
+    if (activeChatIdRef.current === chatId || streamingChatIdRef.current === chatId) {
+      if (tokenFlushTimerRef.current) {
+        clearTimeout(tokenFlushTimerRef.current)
+        tokenFlushTimerRef.current = null
+      }
+      if (reasoningFlushTimerRef.current) {
+        clearTimeout(reasoningFlushTimerRef.current)
+        reasoningFlushTimerRef.current = null
+      }
+      pendingTokensRef.current = ''
+      pendingReasoningRef.current = ''
+      streamingChatIdRef.current = null
       if (currentRequestIdRef.current && window.api?.agent) {
         window.api.agent.cancel(currentRequestIdRef.current)
         currentRequestIdRef.current = null
@@ -427,12 +485,25 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
     }
     setChats((prev) => {
       const updated = prev.filter((c) => c.id !== chatId)
-      saveSessionsToStorage(updated)
+      if (isHydratedRef.current) {
+        saveSessionsToStorage(updated, 0)
+      }
       return updated
     })
   }, [])
 
   const cancelGeneration = useCallback(() => {
+    if (tokenFlushTimerRef.current) {
+      clearTimeout(tokenFlushTimerRef.current)
+      tokenFlushTimerRef.current = null
+    }
+    if (reasoningFlushTimerRef.current) {
+      clearTimeout(reasoningFlushTimerRef.current)
+      reasoningFlushTimerRef.current = null
+    }
+    pendingTokensRef.current = ''
+    pendingReasoningRef.current = ''
+    streamingChatIdRef.current = null
     if (currentRequestIdRef.current && window.api?.agent) {
       window.api.agent.cancel(currentRequestIdRef.current)
       currentRequestIdRef.current = null
@@ -481,11 +552,16 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
         .catch(() => {})
     }
 
-    const unsubscribe = window.api.agent.onEvent((rawEvent: AgentEvent) => {
-      const evt = normalizeAgentEvent(rawEvent)
-      if (!evt) return
+    const flushPendingTokens = (): void => {
+      if (tokenFlushTimerRef.current) {
+        clearTimeout(tokenFlushTimerRef.current)
+        tokenFlushTimerRef.current = null
+      }
+      const pending = pendingTokensRef.current
+      if (!pending) return
+      pendingTokensRef.current = ''
 
-      const targetChatId = activeChatIdRef.current
+      const targetChatId = streamingChatIdRef.current || activeChatIdRef.current
       if (!targetChatId) return
 
       setChats((prev) =>
@@ -500,108 +576,182 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
 
           const segments: MessageSegment[] = [...(assistantMsg.segments || [])]
 
-          // 1. TOKEN: Streaming assistant text response
-          if (evt.type === 'token') {
-            const token = evt.content || ''
-            if (!token) return c
+          // If previous segment was an active tool round or subagent round, finalize its thinking state
+          const lastSeg = segments[segments.length - 1]
+          if (lastSeg && lastSeg.type === 'tool_round' && lastSeg.isThinking) {
+            const elapsed = Math.max(1, Math.round((Date.now() - roundStartTimeRef.current) / 1000))
+            const initialSummary = lastSeg.summary || getHeuristicRoundSummary(lastSeg.steps)
+            const roundId = lastSeg.id
+            const roundSteps = lastSeg.steps
 
-            // If previous segment was an active tool round or subagent round, finalize its thinking state
-            const lastSeg = segments[segments.length - 1]
-            if (lastSeg && lastSeg.type === 'tool_round' && lastSeg.isThinking) {
-              const elapsed = Math.max(1, Math.round((Date.now() - roundStartTimeRef.current) / 1000))
-              const initialSummary = lastSeg.summary || getHeuristicRoundSummary(lastSeg.steps)
-              const roundId = lastSeg.id
-              const roundSteps = lastSeg.steps
-
-              segments[segments.length - 1] = {
-                ...lastSeg,
-                isThinking: false,
-                totalWorkedSeconds: lastSeg.totalWorkedSeconds || elapsed,
-                summary: initialSummary,
-                steps: lastSeg.steps.map((s) => ({ ...s, isDone: true }))
-              }
-
-              requestAiRoundSummary(targetChatId, roundId, roundSteps)
-            } else if (lastSeg && lastSeg.type === 'subagent_round' && lastSeg.isThinking) {
-              const elapsed = lastSeg.totalWorkedSeconds || Math.max(1, Math.round((Date.now() - roundStartTimeRef.current) / 1000))
-              segments[segments.length - 1] = {
-                ...lastSeg,
-                isThinking: false,
-                totalWorkedSeconds: elapsed,
-                steps: lastSeg.steps.map((s: StepItem) => ({ ...s, isDone: true }))
-              }
+            segments[segments.length - 1] = {
+              ...lastSeg,
+              isThinking: false,
+              totalWorkedSeconds: lastSeg.totalWorkedSeconds || elapsed,
+              summary: initialSummary,
+              steps: lastSeg.steps.map((s) => ({ ...s, isDone: true }))
             }
 
-            const lastSegIndex = segments.length - 1
-            if (lastSegIndex >= 0 && segments[lastSegIndex].type === 'text') {
-              const textSeg = segments[lastSegIndex] as { type: 'text'; id: string; content: string }
-              segments[lastSegIndex] = {
-                ...textSeg,
-                content: textSeg.content + token
-              }
-            } else {
-              segments.push({
-                id: `seg-text-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                type: 'text',
-                content: token
-              })
+            requestAiRoundSummary(targetChatId, roundId, roundSteps)
+          } else if (lastSeg && lastSeg.type === 'subagent_round' && lastSeg.isThinking) {
+            const elapsed = lastSeg.totalWorkedSeconds || Math.max(1, Math.round((Date.now() - roundStartTimeRef.current) / 1000))
+            segments[segments.length - 1] = {
+              ...lastSeg,
+              isThinking: false,
+              totalWorkedSeconds: elapsed,
+              steps: lastSeg.steps.map((s: StepItem) => ({ ...s, isDone: true }))
             }
-            assistantMsg.segments = segments
-            msgs[lastMsgIndex] = assistantMsg
-            return { ...c, messages: msgs }
           }
 
-          // 2. REASONING: Streaming thoughts / chain of thought
-          if (evt.type === 'reasoning') {
-            const rChunk = evt.content || ''
-            if (!rChunk) return c
+          const lastSegIndex = segments.length - 1
+          if (lastSegIndex >= 0 && segments[lastSegIndex].type === 'text') {
+            const textSeg = segments[lastSegIndex] as { type: 'text'; id: string; content: string }
+            segments[lastSegIndex] = {
+              ...textSeg,
+              content: textSeg.content + pending
+            }
+          } else {
+            segments.push({
+              id: `seg-text-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              type: 'text',
+              content: pending
+            })
+          }
+          assistantMsg.segments = segments
+          msgs[lastMsgIndex] = assistantMsg
+          return { ...c, messages: msgs }
+        })
+      )
+    }
 
-            const lastSeg = segments[segments.length - 1]
+    const flushPendingReasoning = (): void => {
+      if (reasoningFlushTimerRef.current) {
+        clearTimeout(reasoningFlushTimerRef.current)
+        reasoningFlushTimerRef.current = null
+      }
+      const pending = pendingReasoningRef.current
+      if (!pending) return
+      pendingReasoningRef.current = ''
 
-            if (!lastSeg || lastSeg.type !== 'tool_round' || !lastSeg.isThinking) {
-              roundStartTimeRef.current = Date.now()
-              const newRound: MessageSegment = {
-                id: `seg-tr-${Date.now()}`,
-                type: 'tool_round',
-                isThinking: true,
-                steps: [
-                  {
-                    id: `thought-${Date.now()}`,
-                    type: 'thought',
-                    action: 'Thinking',
-                    isDone: false,
-                    result: rChunk
-                  }
-                ]
-              }
-              segments.push(newRound)
-            } else {
-              const tr = { ...lastSeg } as { type: 'tool_round'; id: string; steps: StepItem[]; isThinking?: boolean }
-              const steps = [...tr.steps]
-              const lastStep = steps[steps.length - 1]
+      const targetChatId = streamingChatIdRef.current || activeChatIdRef.current
+      if (!targetChatId) return
 
-              if (lastStep && lastStep.type === 'thought') {
-                steps[steps.length - 1] = {
-                  ...lastStep,
-                  result: (lastStep.result || '') + rChunk
-                }
-              } else {
-                steps.push({
+      setChats((prev) =>
+        prev.map((c) => {
+          if (c.id !== targetChatId) return c
+          const msgs = [...c.messages]
+          if (msgs.length === 0) return c
+
+          const lastMsgIndex = msgs.length - 1
+          const assistantMsg = { ...msgs[lastMsgIndex] }
+          if (assistantMsg.role !== 'assistant') return c
+
+          const segments: MessageSegment[] = [...(assistantMsg.segments || [])]
+          const lastSeg = segments[segments.length - 1]
+
+          if (!lastSeg || lastSeg.type !== 'tool_round' || !lastSeg.isThinking) {
+            roundStartTimeRef.current = Date.now()
+            const newRound: MessageSegment = {
+              id: `seg-tr-${Date.now()}`,
+              type: 'tool_round',
+              isThinking: true,
+              steps: [
+                {
                   id: `thought-${Date.now()}`,
                   type: 'thought',
                   action: 'Thinking',
                   isDone: false,
-                  result: rChunk
-                })
-              }
-              tr.steps = steps
-              segments[segments.length - 1] = tr
+                  result: pending
+                }
+              ]
             }
+            segments.push(newRound)
+          } else {
+            const tr = { ...lastSeg } as { type: 'tool_round'; id: string; steps: StepItem[]; isThinking?: boolean }
+            const steps = [...tr.steps]
+            const lastStep = steps[steps.length - 1]
 
-            assistantMsg.segments = segments
-            msgs[lastMsgIndex] = assistantMsg
-            return { ...c, messages: msgs }
+            if (lastStep && lastStep.type === 'thought') {
+              steps[steps.length - 1] = {
+                ...lastStep,
+                result: (lastStep.result || '') + pending
+              }
+            } else {
+              steps.push({
+                id: `thought-${Date.now()}`,
+                type: 'thought',
+                action: 'Thinking',
+                isDone: false,
+                result: pending
+              })
+            }
+            tr.steps = steps
+            segments[segments.length - 1] = tr
           }
+
+          assistantMsg.segments = segments
+          msgs[lastMsgIndex] = assistantMsg
+          return { ...c, messages: msgs }
+        })
+      )
+    }
+
+    const unsubscribe = window.api.agent.onEvent((rawEvent: AgentEvent) => {
+      const evt = normalizeAgentEvent(rawEvent)
+      if (!evt) return
+
+      const targetChatId = streamingChatIdRef.current || activeChatIdRef.current
+      if (!targetChatId) return
+
+      // 1. TOKEN: Streaming assistant text response (batched throttling)
+      if (evt.type === 'token') {
+        const token = evt.content || ''
+        if (!token) return
+
+        if (pendingReasoningRef.current) {
+          flushPendingReasoning()
+        }
+
+        pendingTokensRef.current += token
+
+        if (!tokenFlushTimerRef.current) {
+          tokenFlushTimerRef.current = setTimeout(flushPendingTokens, 40)
+        }
+        return
+      }
+
+      // 2. REASONING: Streaming thoughts / chain of thought (batched throttling)
+      if (evt.type === 'reasoning') {
+        const rChunk = evt.content || ''
+        if (!rChunk) return
+
+        if (pendingTokensRef.current) {
+          flushPendingTokens()
+        }
+
+        pendingReasoningRef.current += rChunk
+
+        if (!reasoningFlushTimerRef.current) {
+          reasoningFlushTimerRef.current = setTimeout(flushPendingReasoning, 40)
+        }
+        return
+      }
+
+      // Flush any pending streamed tokens or reasoning before handling structural events
+      if (pendingTokensRef.current) flushPendingTokens()
+      if (pendingReasoningRef.current) flushPendingReasoning()
+
+      setChats((prev) =>
+        prev.map((c) => {
+          if (c.id !== targetChatId) return c
+          const msgs = [...c.messages]
+          if (msgs.length === 0) return c
+
+          const lastMsgIndex = msgs.length - 1
+          const assistantMsg = { ...msgs[lastMsgIndex] }
+          if (assistantMsg.role !== 'assistant') return c
+
+          const segments: MessageSegment[] = [...(assistantMsg.segments || [])]
 
           // 3. TOOL_START: New tool execution started
           // 3. TOOL_START: New tool execution started
@@ -980,6 +1130,7 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
             msgs[lastMsgIndex] = assistantMsg
             setIsStreaming(false)
             currentRequestIdRef.current = null
+            streamingChatIdRef.current = null
 
             // Auto-generate title if this was the first prompt in a new session
             if (c.messages.length <= 2 && (c.title.startsWith('Новый диалог') || c.title.length > 30)) {
@@ -1028,6 +1179,7 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
             msgs[lastMsgIndex] = assistantMsg
             setIsStreaming(false)
             currentRequestIdRef.current = null
+            streamingChatIdRef.current = null
             return { ...c, messages: msgs }
           }
 
@@ -1064,6 +1216,16 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
     })
 
     return () => {
+      if (tokenFlushTimerRef.current) {
+        clearTimeout(tokenFlushTimerRef.current)
+        tokenFlushTimerRef.current = null
+      }
+      if (reasoningFlushTimerRef.current) {
+        clearTimeout(reasoningFlushTimerRef.current)
+        reasoningFlushTimerRef.current = null
+      }
+      if (pendingTokensRef.current) flushPendingTokens()
+      if (pendingReasoningRef.current) flushPendingReasoning()
       if (typeof unsubscribe === 'function') {
         unsubscribe()
       }
@@ -1205,6 +1367,10 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
         })
       )
     }
+
+    streamingChatIdRef.current = targetChatId
+    pendingTokensRef.current = ''
+    pendingReasoningRef.current = ''
 
     // Bind the working directory: explicit project > the chat's stored project
     const effectiveWorkspace =

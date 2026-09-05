@@ -1,5 +1,5 @@
 import { OpenAiMessage } from '../core/ContextCompactor'
-import { writeFileSync } from 'fs'
+import fs from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
 
@@ -88,16 +88,6 @@ export class ChatService {
       const baseName = parts[parts.length - 1]
       if (baseName && !candidateModels.includes(baseName)) {
         candidateModels.push(baseName)
-      }
-    }
-
-    // Common proxy alias fallbacks for gemini-3.7-flash
-    if (rawModel.includes('gemini-3.7-flash') && !rawModel.includes('tiered')) {
-      if (!candidateModels.includes('antigravity/antigravity/gemini-3.7-flash-tiered')) {
-        candidateModels.push('antigravity/antigravity/gemini-3.7-flash-tiered')
-      }
-      if (!candidateModels.includes('antigravity/gemini-3-flash')) {
-        candidateModels.push('antigravity/gemini-3-flash')
       }
     }
 
@@ -329,22 +319,24 @@ export class ChatService {
     abortSignal?: AbortSignal
   ): Promise<ChatResponse> {
     let baseUrl = (config.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '')
+    if (baseUrl.includes('api.anthropic.com')) {
+      return this._sendAnthropicRequest(config, messages, tools, onContentChunk, onReasoningChunk, abortSignal)
+    }
     const url = baseUrl.endsWith('/chat/completions') ? baseUrl : `${baseUrl}/chat/completions`
 
     const isStreaming = config.stream !== false
     const isOpenAI = url.includes('api.openai.com')
     const isOpenRouter = url.includes('openrouter.ai')
-    // Detect Gemini-like endpoints (direct Gemini, OmniRoute proxy to Gemini, or model name contains "gemini")
-    const isGeminiLike = url.includes('generativelanguage.googleapis.com') ||
-      (config.model || '').toLowerCase().includes('gemini')
+    // Detect direct GenerativeLanguage endpoints vs OpenAI-compatible proxies
+    const isDirectGeminiEndpoint = url.includes('generativelanguage.googleapis.com')
+    const isGeminiLike = isDirectGeminiEndpoint || (config.model || '').toLowerCase().includes('gemini')
 
     const sanitizedMessages = this.sanitizeMessages(messages, config)
 
     const cleanModel = (config.model || 'gpt-4o').replace(/^models\//, '').trim()
 
-    // OmniRoute and similar proxies to Gemini often don't support SSE streaming,
-    // returning 400 for stream:true. Force non-streaming for Gemini-like endpoints.
-    const effectiveStreaming = isGeminiLike ? false : isStreaming
+    // Respect streaming configuration; only disable if hitting raw generativelanguage.googleapis.com
+    const effectiveStreaming = isDirectGeminiEndpoint ? false : isStreaming
 
     const body: Record<string, unknown> = {
       model: cleanModel,
@@ -458,13 +450,12 @@ export class ChatService {
       const msgCount = Array.isArray(body.messages) ? (body.messages as any[]).length : 0
       const bodyKeys = Object.keys(body).join(', ')
       console.error(`[ChatService] Request details: keys=[${bodyKeys}], tools=[${toolNames}], messages=${msgCount}, bodySize=${bodyJson.length}`)
-      // Dump full request body to a debug file for inspection
+      // Dump full request body to a debug file for inspection asynchronously
       try {
         const debugPath = join(app.getPath('userData'), 'debug_request_body.json')
-        writeFileSync(debugPath, JSON.stringify(body, null, 2), 'utf-8')
-        console.error(`[ChatService] Full request body dumped to: ${debugPath}`)
-      } catch (dumpErr) {
-        console.error('[ChatService] Failed to dump request body:', dumpErr)
+        fs.promises.writeFile(debugPath, JSON.stringify(body, null, 2), 'utf-8').catch(() => {})
+      } catch {
+        // Non-critical diagnostic dump failure
       }
       throw new Error(`API ${response.status}: ${text.slice(0, 300)}`)
     }
@@ -536,8 +527,16 @@ export class ChatService {
       // Strip fields that Gemini / proxy translators may reject
       if (key === 'default') continue
       if (key === 'additionalProperties') continue
-      // Strip "required" arrays — many Gemini proxy translators fail on this
-      if (key === 'required') continue
+      // Keep valid non-empty required arrays so model knows mandatory parameters
+      if (key === 'required') {
+        if (Array.isArray(value)) {
+          const filtered = (value as unknown[]).filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+          if (filtered.length > 0) {
+            result.required = filtered
+          }
+        }
+        continue
+      }
 
       if (key === 'type' && value === 'integer') {
         // Gemini sometimes rejects "integer" — normalize to "number"
@@ -761,6 +760,260 @@ export class ChatService {
       reasoningContent: reasoningBuf,
       toolCalls: finalToolCalls,
       usage
+    }
+  }
+
+  private static async _sendAnthropicRequest(
+    config: ChatConfig,
+    messages: OpenAiMessage[],
+    tools?: OpenAiToolDefinition[],
+    onContentChunk?: (chunk: string) => void,
+    onReasoningChunk?: (reasoningChunk: string) => void,
+    abortSignal?: AbortSignal
+  ): Promise<ChatResponse> {
+    const rawBase = (config.baseUrl || 'https://api.anthropic.com/v1').replace(/\/+$/, '')
+    const url = rawBase.endsWith('/messages') ? rawBase : `${rawBase}/messages`
+    const isStreaming = config.stream !== false
+    const cleanModel = (config.model || 'claude-3-7-sonnet-20250219').replace(/^models\//, '').trim()
+
+    // 1. Separate system instruction and convert messages
+    const systemParts: string[] = []
+    const convertedMessages: Array<{ role: 'user' | 'assistant'; content: any }> = []
+
+    for (const m of messages) {
+      if (!m) continue
+      if (m.role === 'system' || m.role === 'developer') {
+        const text = typeof m.content === 'string' ? m.content.trim() : ''
+        if (text) systemParts.push(text)
+      } else if (m.role === 'assistant') {
+        const contentBlocks: any[] = []
+        if (typeof m.content === 'string' && m.content.trim()) {
+          contentBlocks.push({ type: 'text', text: m.content })
+        }
+        if (Array.isArray(m.tool_calls)) {
+          for (const tc of m.tool_calls) {
+            let inputArgs = {}
+            try {
+              inputArgs = JSON.parse(tc.function?.arguments || '{}')
+            } catch {}
+            contentBlocks.push({
+              type: 'tool_use',
+              id: tc.id || `toolu_${Math.random().toString(36).slice(2)}`,
+              name: tc.function?.name || 'tool',
+              input: inputArgs
+            })
+          }
+        }
+        if (contentBlocks.length > 0) {
+          convertedMessages.push({ role: 'assistant', content: contentBlocks })
+        }
+      } else if (m.role === 'tool') {
+        const toolResultBlock = {
+          type: 'tool_result',
+          tool_use_id: m.tool_call_id || '',
+          content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content || '')
+        }
+        const lastConv = convertedMessages[convertedMessages.length - 1]
+        if (lastConv && lastConv.role === 'user' && Array.isArray(lastConv.content)) {
+          lastConv.content.push(toolResultBlock)
+        } else {
+          convertedMessages.push({ role: 'user', content: [toolResultBlock] })
+        }
+      } else {
+        // user role
+        const userText = typeof m.content === 'string' ? m.content : JSON.stringify(m.content || '')
+        const lastConv = convertedMessages[convertedMessages.length - 1]
+        if (
+          lastConv &&
+          lastConv.role === 'user' &&
+          Array.isArray(lastConv.content) &&
+          typeof lastConv.content[0] === 'object' &&
+          lastConv.content[0].type !== 'tool_result'
+        ) {
+          lastConv.content.push({ type: 'text', text: userText })
+        } else {
+          convertedMessages.push({ role: 'user', content: [{ type: 'text', text: userText }] })
+        }
+      }
+    }
+
+    if (convertedMessages.length === 0) {
+      convertedMessages.push({ role: 'user', content: [{ type: 'text', text: 'Hello' }] })
+    }
+
+    const body: Record<string, unknown> = {
+      model: cleanModel,
+      messages: convertedMessages,
+      max_tokens: config.maxTokens && config.maxTokens > 0 ? config.maxTokens : 4096,
+      stream: isStreaming
+    }
+
+    if (systemParts.length > 0) {
+      body.system = systemParts.join('\n\n')
+    }
+
+    if (typeof config.temperature === 'number') {
+      body.temperature = Math.max(0, Math.min(1.0, config.temperature))
+    }
+
+    if (tools && tools.length > 0) {
+      body.tools = tools.map((t) => ({
+        name: t.function.name,
+        description: t.function.description,
+        input_schema: t.function.parameters
+      }))
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'x-api-key': (config.apiKey || '').trim(),
+      'anthropic-version': '2023-06-01'
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: abortSignal
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      throw new Error(`Anthropic API ${response.status}: ${text.slice(0, 300)}`)
+    }
+
+    if (!isStreaming) {
+      const json: any = await response.json()
+      let content = ''
+      let reasoning = ''
+      const toolCalls: ToolCallChunk[] = []
+
+      if (Array.isArray(json.content)) {
+        for (const block of json.content) {
+          if (block.type === 'text') {
+            content += block.text || ''
+          } else if (block.type === 'thinking') {
+            reasoning += block.thinking || ''
+          } else if (block.type === 'tool_use') {
+            toolCalls.push({
+              id: block.id,
+              name: block.name,
+              argumentsJson: JSON.stringify(block.input || {})
+            })
+          }
+        }
+      }
+
+      if (content && onContentChunk) onContentChunk(content)
+      if (reasoning && onReasoningChunk) onReasoningChunk(reasoning)
+
+      return {
+        content,
+        reasoningContent: reasoning,
+        toolCalls,
+        usage: json.usage
+          ? {
+              promptTokens: json.usage.input_tokens || 0,
+              completionTokens: json.usage.output_tokens || 0,
+              totalTokens: (json.usage.input_tokens || 0) + (json.usage.output_tokens || 0)
+            }
+          : undefined
+      }
+    }
+
+    return this._parseAnthropicStream(response, onContentChunk, onReasoningChunk)
+  }
+
+  private static async _parseAnthropicStream(
+    response: Response,
+    onContentChunk?: (chunk: string) => void,
+    onReasoningChunk?: (reasoningChunk: string) => void
+  ): Promise<ChatResponse> {
+    if (!response.body) throw new Error('Response body is empty')
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let contentBuf = ''
+    let reasoningBuf = ''
+    const toolCallsMap: Map<number, { id: string; name: string; argsBuf: string }> = new Map()
+    let promptTokens = 0
+    let completionTokens = 0
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed.startsWith('data: ')) continue
+          const dataStr = trimmed.slice(6).trim()
+          if (!dataStr || dataStr === '[DONE]') continue
+          let parsed: any
+          try {
+            parsed = JSON.parse(dataStr)
+          } catch {
+            continue
+          }
+
+          if (parsed.type === 'message_start' && parsed.message?.usage) {
+            promptTokens = parsed.message.usage.input_tokens || 0
+          }
+          if (parsed.type === 'message_delta' && parsed.usage) {
+            completionTokens = parsed.usage.output_tokens || 0
+          }
+
+          if (parsed.type === 'content_block_start') {
+            const idx = parsed.index ?? 0
+            if (parsed.content_block?.type === 'tool_use') {
+              toolCallsMap.set(idx, {
+                id: parsed.content_block.id || `toolu_${Math.random().toString(36).slice(2)}`,
+                name: parsed.content_block.name || '',
+                argsBuf: ''
+              })
+            }
+          }
+
+          if (parsed.type === 'content_block_delta') {
+            const idx = parsed.index ?? 0
+            const delta = parsed.delta
+            if (delta?.type === 'text_delta' && delta.text) {
+              contentBuf += delta.text
+              onContentChunk?.(delta.text)
+            } else if (delta?.type === 'thinking_delta' && delta.thinking) {
+              reasoningBuf += delta.thinking
+              onReasoningChunk?.(delta.thinking)
+            } else if (delta?.type === 'input_json_delta' && delta.partial_json) {
+              const tc = toolCallsMap.get(idx)
+              if (tc) {
+                tc.argsBuf += delta.partial_json
+              }
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock()
+    }
+
+    const toolCalls: ToolCallChunk[] = Array.from(toolCallsMap.values()).map((tc) => ({
+      id: tc.id,
+      name: tc.name,
+      argumentsJson: tc.argsBuf || '{}'
+    }))
+
+    return {
+      content: contentBuf,
+      reasoningContent: reasoningBuf,
+      toolCalls,
+      usage: {
+        promptTokens,
+        completionTokens,
+        totalTokens: promptTokens + completionTokens
+      }
     }
   }
 }

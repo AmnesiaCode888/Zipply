@@ -184,12 +184,117 @@ export function calculateTotal(items: number[]): number {
   assert.ok(archPrompt.includes('REPOSITORY ARCHITECTURE MAP'), 'Repo map injected')
   console.log('  ✅ ArchitectAgent: system prompt and role constraints verified.\n')
 
+  // Test 8: Security Guards & Robust JSON Repair
+  console.log('▶ Testing Component 8: Security Guards & Robust JSON Repair...')
+  const { ToolExecutor } = await import('../src/main/agent/core/ToolExecutor')
+  // 8.1 Truncated unclosed string JSON repair
+  const repaired = ToolExecutor.parseArgs('{"action": "write", "content": "truncated text')
+  assert.strictEqual(repaired.content, 'truncated text', 'ToolExecutor must repair unclosed string')
+
+  // 8.2 FileTool sensitive directory rejection
+  const sensitiveRes = await fileTool.execute(
+    JSON.stringify({ action: 'read', path: 'C:/Users/test/.ssh/id_rsa' }),
+    new Blackboard()
+  )
+  assert.ok(sensitiveRes.formattedContent?.includes('Blocked access to sensitive system path'), 'FileTool should block .ssh access')
+
+  // 8.3 TerminalTool encoded execution rejection
+  const termRes = await (new TerminalTool()).execute(
+    JSON.stringify({ action: 'run', command: 'powershell -enc aQBlAHgA' }),
+    new Blackboard()
+  )
+  assert.ok(termRes.formattedContent?.includes('Blocked potentially destructive shell command'), 'TerminalTool should block -enc commands')
+  console.log('  ✅ Security guards & JSON unclosed string repair verified.\n')
+
+  // Test 9: TerminalSessionManager & TerminalTool (AI Terminal & Process Awareness)
+  console.log('▶ Testing Component 9: TerminalSessionManager & TerminalTool (Terminal Awareness)...')
+  const { TerminalSessionManager } = await import('../src/main/services/TerminalSessionManager')
+  const sessionMgr = TerminalSessionManager.getInstance()
+
+  // 9.1 Register sessions and simulate user command
+  sessionMgr.registerOrUpdateSession({
+    id: 'term_user_1',
+    name: '1: powershell',
+    cwd: projectRoot
+  })
+
+  sessionMgr.recordCommandStart({
+    sessionId: 'term_user_1',
+    runId: 'cmd_user_101',
+    command: 'npm test',
+    cwd: projectRoot,
+    initiator: 'user'
+  })
+  sessionMgr.appendOutput('cmd_user_101', 'FAIL src/auth.test.ts: Invalid token\nTest Suites: 1 failed')
+  sessionMgr.recordCommandExit('cmd_user_101', 1)
+
+  // 9.2 Test list_terminals action
+  const listRes = await (new TerminalTool()).execute(
+    JSON.stringify({ action: 'list_terminals' }),
+    new Blackboard()
+  )
+  assert.ok(listRes.formattedContent.includes('term_user_1'), 'list_terminals must show term_user_1')
+  assert.ok(listRes.formattedContent.includes('npm test'), 'list_terminals must show last user command')
+  assert.ok(listRes.formattedContent.includes('[USER]'), 'list_terminals must tag initiator as [USER]')
+
+  // 9.3 Test read_terminal action
+  const readRes = await (new TerminalTool()).execute(
+    JSON.stringify({ action: 'read_terminal', session_id: 'term_user_1' }),
+    new Blackboard()
+  )
+  assert.ok(readRes.formattedContent.includes('[USER INPUT]'), 'read_terminal must indicate [USER INPUT]')
+  assert.ok(readRes.formattedContent.includes('npm test'), 'read_terminal must include executed command')
+  assert.ok(readRes.formattedContent.includes('Exit Code: 1'), 'read_terminal must show exit code')
+  assert.ok(readRes.formattedContent.includes('FAIL src/auth.test.ts'), 'read_terminal must include stdout/stderr')
+
+  // 9.4 Test user typing into an AI terminal after AI execution
+  const aiSessionId = 'term_ai_build_run'
+  sessionMgr.registerOrUpdateSession({
+    id: aiSessionId,
+    name: 'build',
+    cwd: projectRoot,
+    isAi: true
+  })
+  // AI ran build
+  sessionMgr.recordCommandStart({
+    sessionId: aiSessionId,
+    runId: 'ai_build_1',
+    command: 'npm run build',
+    cwd: projectRoot,
+    initiator: 'ai'
+  })
+  sessionMgr.appendOutput('ai_build_1', '✓ built in 820ms')
+  sessionMgr.recordCommandExit('ai_build_1', 0)
+
+  // Later, user typed follow-up command in that exact same AI terminal
+  sessionMgr.recordCommandStart({
+    sessionId: aiSessionId,
+    runId: 'user_followup_2',
+    command: 'node dist/index.js --port 3000',
+    cwd: projectRoot,
+    initiator: 'user'
+  })
+  sessionMgr.appendOutput('user_followup_2', 'Server listening on http://localhost:3000')
+  sessionMgr.recordCommandExit('user_followup_2', 0)
+
+  // AI reads that AI terminal session
+  const readAiTabRes = await (new TerminalTool()).execute(
+    JSON.stringify({ action: 'read_terminal', session_id: aiSessionId }),
+    new Blackboard()
+  )
+  assert.ok(readAiTabRes.formattedContent.includes('[AI COMMAND]'), 'Must show earlier AI command')
+  assert.ok(readAiTabRes.formattedContent.includes('npm run build'), 'Must show build command')
+  assert.ok(readAiTabRes.formattedContent.includes('[USER INPUT]'), 'Must show subsequent USER command')
+  assert.ok(readAiTabRes.formattedContent.includes('node dist/index.js --port 3000'), 'Must show command typed by user')
+  assert.ok(readAiTabRes.formattedContent.includes('Server listening on http://localhost:3000'), 'Must show output produced')
+  console.log('  ✅ TerminalSessionManager: user input in AI terminals & terminal reading verified.\n')
+
   // Clean up temporary mjs script
   if (fs.existsSync(path.join(projectRoot, 'scripts', 'test-agent-sota.mjs'))) {
     fs.unlinkSync(path.join(projectRoot, 'scripts', 'test-agent-sota.mjs'))
   }
 
-  console.log('🎉 ALL 7 SOTA AGENT ENHANCEMENT COMPONENTS VERIFIED SUCCESSFULLY!\n')
+  console.log('🎉 ALL 9 SOTA AGENT ENHANCEMENT COMPONENTS VERIFIED SUCCESSFULLY!\n')
 }
 
 runTests().catch((err) => {

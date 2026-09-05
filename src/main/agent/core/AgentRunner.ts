@@ -300,6 +300,15 @@ export class AgentRunner {
         return
       }
 
+      if (blackboard.getArtifact('task_completed') === true) {
+        loopDone = true
+        safeEmit({ type: 'done', usage: totalUsage })
+        if (parentBlackboard === null && userQueryText && config.enableAutoExtract !== false) {
+          this._runPostSessionExtraction(history, config, userQueryText).catch(() => {})
+        }
+        return
+      }
+
       // ── Record tool calls into watchdog log ──────────────────────────────
       for (const toolCall of response.toolCalls) {
         let args: Record<string, unknown> = {}

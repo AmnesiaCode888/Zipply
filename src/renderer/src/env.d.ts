@@ -189,6 +189,39 @@ export interface WindowApi {
     exportBackup: () => Promise<{ success: boolean; filePath?: string; cancelled?: boolean; error?: string }>
     importBackup: () => Promise<{ success: boolean; details?: string; cancelled?: boolean; error?: string }>
   }
+  files: {
+    readDir: (dirPath: string) => Promise<{
+      success: boolean
+      items?: Array<{
+        name: string
+        path: string
+        isDirectory: boolean
+        isFile: boolean
+        size: number
+        mtime: number
+        ext: string
+      }>
+      error?: string
+    }>
+    createFile: (filePath: string) => Promise<{ success: boolean; error?: string }>
+    createDir: (dirPath: string) => Promise<{ success: boolean; error?: string }>
+    rename: (oldPath: string, newPath: string) => Promise<{ success: boolean; error?: string }>
+    move: (sourcePath: string, targetDirPath: string) => Promise<{ success: boolean; destPath?: string; error?: string }>
+    delete: (targetPath: string) => Promise<{ success: boolean; error?: string }>
+    reveal: (targetPath: string) => Promise<boolean>
+  }
+  terminal: {
+    run: (params: { runId: string; command: string; cwd?: string; sessionId?: string }) => void
+    sendInput: (params: { targetId: string; input: string }) => Promise<{ success: boolean; message: string }>
+    syncSessions: (sessions: any[], activeSessionId?: string) => void
+    kill: (runId?: string) => Promise<boolean>
+    getDefaultCwd: () => Promise<string>
+    onData: (callback: (data: { runId: string; text: string; stream: 'stdout' | 'stderr' }) => void) => () => void
+    onExit: (callback: (data: { runId: string; code: number }) => void) => () => void
+    onAiStart: (callback: (data: { runId: string; command: string; cwd: string; isBackground?: boolean }) => void) => () => void
+    onAiData: (callback: (data: { runId: string; text: string }) => void) => () => void
+    onAiExit: (callback: (data: { runId: string; code?: number | null }) => void) => () => void
+  }
   setZoomFactor: (factor: number) => void
 }
 

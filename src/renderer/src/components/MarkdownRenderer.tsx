@@ -85,13 +85,8 @@ export function renderMarkdown(
     if (isCodeBlock) {
       const lines = part.split('\n')
       const firstLine = lines[0]?.trim() || ''
-      const lang = [
-        'typescript', 'javascript', 'ts', 'js', 'css', 'html', 'json',
-        'csharp', 'cs', 'python', 'py', 'markdown', 'md', 'bash', 'sh',
-        'sql', 'yaml', 'yml', 'xml', 'rust', 'go', 'cpp', 'c'
-      ].includes(firstLine.toLowerCase())
-        ? firstLine.toLowerCase()
-        : ''
+      const isIdentifier = /^[a-zA-Z0-9_#+.-]+$/.test(firstLine) && firstLine.length <= 32
+      const lang = isIdentifier ? firstLine.toLowerCase() : ''
       const codeLines = lang ? lines.slice(1) : lines
       const codeText = codeLines.join('\n').replace(/^\n+|\n+$/g, '')
 

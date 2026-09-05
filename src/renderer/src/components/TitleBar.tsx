@@ -1,6 +1,6 @@
 import React from 'react'
-import { PanelLeft, X, Trash2 } from 'lucide-react'
-import { useWindowControls } from '../hooks/useWindowControls'
+import { PanelLeft, X, Trash2, Terminal } from 'lucide-react'
+import { WindowControls } from './WindowControls'
 import { SettingsTab } from '../types/settings'
 import './TitleBar.css'
 
@@ -10,7 +10,9 @@ interface TitleBarProps {
   isSettingsOpen?: boolean
   activeSettingsTab?: SettingsTab
   activeNavTab?: 'dialogs' | 'notes' | 'skills'
+  isRightPanelOpen?: boolean
   onToggleSidebar?: () => void
+  onToggleRightPanel?: () => void
   onNewChat?: () => void
   onDeleteChat?: () => void
   onCloseSettings?: () => void
@@ -30,15 +32,15 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   isSettingsOpen = false,
   activeSettingsTab = 'models',
   activeNavTab = 'dialogs',
+  isRightPanelOpen = false,
   onToggleSidebar,
+  onToggleRightPanel,
   onNewChat,
   onDeleteChat,
   onCloseSettings
 }) => {
-  const { isMaximized, minimize, maximize, close } = useWindowControls()
-
   const handleDoubleClick = (): void => {
-    maximize()
+    window.api?.window?.maximize?.()
   }
 
   return (
@@ -166,42 +168,23 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 
       <div className="titlebar-drag-spacer" />
 
-      <div className="window-controls">
-        <button
-          className="control-btn btn-green"
-          onClick={maximize}
-          title={isMaximized ? 'Восстановить' : 'Развернуть'}
-          aria-label={isMaximized ? 'Restore' : 'Maximize'}
-        >
-          <svg viewBox="0 0 10 10" fill="currentColor">
-            {isMaximized ? (
-              <path d="M2.5 4.5l2.5-2.5 2.5 2.5M7.5 5.5l-2.5 2.5-2.5-2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-            ) : (
-              <path d="M2 2l6 6M8 2L2 8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-            )}
-          </svg>
-        </button>
-        <button
-          className="control-btn btn-yellow"
-          onClick={minimize}
-          title="Свернуть"
-          aria-label="Minimize"
-        >
-          <svg viewBox="0 0 10 10" fill="currentColor">
-            <path d="M1.5 5h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-        </button>
-        <button
-          className="control-btn btn-red"
-          onClick={close}
-          title="Закрыть"
-          aria-label="Close"
-        >
-          <svg viewBox="0 0 10 10" fill="currentColor">
-            <path d="M1.5 1.5l7 7m0-7l-7 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-        </button>
-      </div>
+      {!isRightPanelOpen && (
+        <div className="titlebar-right-closed">
+          {onToggleRightPanel && (
+            <button
+              type="button"
+              className="titlebar-terminal-btn"
+              title="Открыть терминал (Ctrl+`)"
+              aria-label="Терминал"
+              onClick={onToggleRightPanel}
+            >
+              <Terminal size={14} strokeWidth={2} />
+            </button>
+          )}
+
+          <WindowControls />
+        </div>
+      )}
     </header>
   )
 }

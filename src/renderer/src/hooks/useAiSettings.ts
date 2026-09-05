@@ -438,13 +438,14 @@ export function useAiSettings() {
           next = { ...next, ...fileConfig }
         }
 
-        // 2. Set platform-correct baseDir if not already set or if it's still the old Windows default
+        // 2. Set platform-correct baseDir if not already set or if it's still an obsolete default
         if (info?.defaultProjectsDir) {
-          const baseDirIsDefault = !next.baseDir || next.baseDir === 'd:/clickprojects' || next.baseDir === 'd:/zippleprojects' || next.baseDir === 'd:/zipplyprojects'
+          const normalizedBase = (next.baseDir || '').replace(/\\/g, '/').toLowerCase()
+          const isObsoleteDefault = normalizedBase === 'd:/clickprojects' || normalizedBase === 'd:/zippleprojects'
+          const isDefault = !next.baseDir || isObsoleteDefault || normalizedBase === 'd:/zipplyprojects'
           const isNotWin = info.platform !== 'win32'
-          if (baseDirIsDefault && isNotWin) {
-            next = { ...next, baseDir: info.defaultProjectsDir }
-          } else if (!next.baseDir) {
+
+          if ((isDefault && isNotWin) || isObsoleteDefault || !next.baseDir) {
             next = { ...next, baseDir: info.defaultProjectsDir }
           }
         }

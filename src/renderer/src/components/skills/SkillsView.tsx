@@ -481,17 +481,12 @@ export const SkillsView: React.FC = () => {
             <Search size={15} className="skills-search-icon" />
             <input
               type="text"
-              placeholder={config?.embeddingModel ? "Векторный поиск по смыслу..." : "Поиск по имени, описанию, триггерам..."}
+              placeholder="Поиск по имени, описанию, триггерам..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
             <div className="skills-search-trail">
               {isSearching && <RefreshCw size={13} className="skills-search-spinning-icon" />}
-              {config?.embeddingModel && !isSearching && (
-                <span className="skills-vector-active-pill" title={`Активна векторная модель: ${config.embeddingModel}`}>
-                  ⚡ Вектор
-                </span>
-              )}
               {searchQuery && (
                 <button
                   type="button"

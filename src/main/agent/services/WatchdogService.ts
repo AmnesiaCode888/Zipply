@@ -240,10 +240,12 @@ Signs of real progress: ${profile.progressHints}
 Compressed action log (${entries.length} total tool calls, showing last ${Math.min(entries.length, 100)}):
 ${compressedLog}`
 
+    const modelToUse = (config.fastModel && config.fastModel.trim()) || config.model || 'gpt-4o'
     try {
       const response = await ChatService.chat(
         {
           ...config,
+          model: modelToUse,
           maxTokens: 80,
           stream: false,
           temperature: 0.2

@@ -72,9 +72,8 @@ export class ContextCompactor {
       return anchoredMessages
     }
 
-    // 2. Calculate approximate current context token usage (1 token ≈ 4 chars)
-    const estimatedChars = this._estimateTotalChars(anchoredMessages)
-    const estimatedTokens = Math.ceil(estimatedChars / 4)
+    // 2. Calculate accurate context token usage factoring in ASCII vs Cyrillic/non-ASCII weights
+    const estimatedTokens = this._estimateTokens(anchoredMessages)
     const usageRatio = estimatedTokens / maxContextTokens
 
     // Dynamic pruning thresholds based on capacity usage
@@ -305,5 +304,40 @@ export class ContextCompactor {
       }
     }
     return total
+  }
+
+  private static _estimateTokens(messages: OpenAiMessage[]): number {
+    let tokens = 0
+    const countTextTokens = (text: string): number => {
+      let asciiChars = 0
+      let nonAsciiChars = 0
+      for (let i = 0; i < text.length; i++) {
+        if (text.charCodeAt(i) <= 127) {
+          asciiChars++
+        } else {
+          nonAsciiChars++
+        }
+      }
+      return Math.ceil(asciiChars / 4) + Math.ceil(nonAsciiChars * 1.1)
+    }
+
+    for (const m of messages) {
+      if (typeof m.content === 'string') {
+        tokens += countTextTokens(m.content)
+      } else if (Array.isArray(m.content)) {
+        for (const item of m.content) {
+          if (item.type === 'text' && item.text) tokens += countTextTokens(item.text)
+        }
+      }
+      if (Array.isArray(m.tool_calls)) {
+        for (const tc of m.tool_calls) {
+          const fn = tc.function
+          if (fn) {
+            tokens += countTextTokens((fn.name || '') + (fn.arguments || ''))
+          }
+        }
+      }
+    }
+    return tokens
   }
 }

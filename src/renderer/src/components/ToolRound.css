@@ -136,6 +136,50 @@
   color: var(--text-primary, #D4D4D8);
 }
 
+.starting-pulse-icon {
+  color: var(--accent-color, #8B5CF6);
+  animation: startingIconPulse 1.8s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes startingIconPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.85;
+    filter: drop-shadow(0 0 0px rgba(139, 92, 246, 0));
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+    filter: drop-shadow(0 0 5px rgba(139, 92, 246, 0.6));
+  }
+}
+
+.starting-status-text {
+  font-weight: 480;
+  letter-spacing: -0.01em;
+  background: linear-gradient(
+    90deg,
+    rgba(226, 226, 230, 0.7) 0%,
+    rgba(255, 255, 255, 1) 35%,
+    rgba(167, 139, 250, 0.95) 55%,
+    rgba(226, 226, 230, 0.7) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: startingTextShimmer 2.2s ease-in-out infinite;
+}
+
+@keyframes startingTextShimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
 .streaming-live-header {
   display: inline-flex;
   align-items: center;

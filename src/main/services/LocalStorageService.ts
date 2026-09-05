@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import os from 'os'
 import { app, shell } from 'electron'
 
 export type StoreName = 'config' | 'appearance' | 'chats' | 'projects' | 'kv_store'
@@ -61,30 +62,141 @@ export class LocalStorageService {
   }
 
   /**
-   * Automatically detect and migrate all legacy data from Zipple / ClickCoder / clickcode / click directories.
+   * Returns canonical user data path for the current OS:
+   * - Windows: %APPDATA%\Zipply
+   * - Linux: $XDG_CONFIG_HOME/zipply (or ~/.config/zipply)
+   * - macOS: ~/Library/Application Support/Zipply
+   */
+  static getCanonicalUserDataDir(): string {
+    const isWin = process.platform === 'win32'
+    const isMac = process.platform === 'darwin'
+    const home = process.env.USERPROFILE || process.env.HOME || os.homedir()
+
+    if (isWin) {
+      const appData = process.env.APPDATA || path.join(home, 'AppData', 'Roaming')
+      return path.join(appData, 'Zipply')
+    } else if (isMac) {
+      return path.join(home, 'Library', 'Application Support', 'Zipply')
+    } else {
+      const xdgConfig = process.env.XDG_CONFIG_HOME || path.join(home, '.config')
+      return path.join(xdgConfig, 'zipply')
+    }
+  }
+
+  private static _mergeChats(existingChats: any[], incomingChats: any[]): any[] {
+    const chatMap = new Map<string, any>()
+
+    for (const c of existingChats) {
+      if (c && c.id) {
+        chatMap.set(c.id, c)
+      }
+    }
+
+    for (const inc of incomingChats) {
+      if (!inc || !inc.id) continue
+      if (!chatMap.has(inc.id)) {
+        chatMap.set(inc.id, inc)
+      } else {
+        const ex = chatMap.get(inc.id)
+        const exMsgCount = Array.isArray(ex.messages) ? ex.messages.length : 0
+        const incMsgCount = Array.isArray(inc.messages) ? inc.messages.length : 0
+        if (incMsgCount > exMsgCount) {
+          chatMap.set(inc.id, inc)
+        } else if (incMsgCount === exMsgCount) {
+          const exTime = new Date(ex.updatedAt || ex.createdAt || 0).getTime()
+          const incTime = new Date(inc.updatedAt || inc.createdAt || 0).getTime()
+          if (incTime > exTime) {
+            chatMap.set(inc.id, inc)
+          }
+        }
+      }
+    }
+
+    const merged = Array.from(chatMap.values())
+    merged.sort((a, b) => {
+      const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime()
+      const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime()
+      return timeB - timeA
+    })
+    return merged
+  }
+
+  private static _createChatBackup(filePath: string, tag: string): void {
+    try {
+      if (!fs.existsSync(filePath)) return
+      const dir = path.dirname(filePath)
+      const backupsDir = path.join(dir, 'backups')
+      if (!fs.existsSync(backupsDir)) {
+        fs.mkdirSync(backupsDir, { recursive: true })
+      }
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+      const backupFile = path.join(backupsDir, `chats-${tag}-${timestamp}.json`)
+      fs.copyFileSync(filePath, backupFile)
+
+      const allBackups = fs.readdirSync(backupsDir)
+        .filter((f) => f.startsWith('chats-') && f.endsWith('.json'))
+        .map((f) => ({ name: f, time: fs.statSync(path.join(backupsDir, f)).mtimeMs }))
+        .sort((a, b) => b.time - a.time)
+
+      if (allBackups.length > 10) {
+        for (const old of allBackups.slice(10)) {
+          try {
+            fs.unlinkSync(path.join(backupsDir, old.name))
+          } catch {}
+        }
+      }
+    } catch (e) {
+      console.warn('[LocalStorageService] Backup creation warning:', e)
+    }
+  }
+
+  /**
+   * Automatically detect and migrate/merge all legacy data from
+   * Zipple / ClickCoder / clickcode / click / casing variations across all operating systems.
    */
   static migrateFromLegacy(): void {
     try {
-      const currentUserData = app ? app.getPath('userData') : ''
+      const currentUserData = app && typeof app.getPath === 'function'
+        ? app.getPath('userData')
+        : this.getCanonicalUserDataDir()
       if (!currentUserData) return
 
-      const appDataParent = app ? app.getPath('appData') : (process.env.APPDATA || path.join(process.env.HOME || '', '.config'))
-      const legacyFolderNames = ['zipple', 'Zipple', 'ClickCoder', 'clickcoder', 'ClickCode', 'clickcode', 'Click', 'click']
+      const appDataParent = app && typeof app.getPath === 'function'
+        ? app.getPath('appData')
+        : (process.env.APPDATA || path.join(process.env.HOME || process.env.USERPROFILE || '', '.config'))
+      
+      const legacyFolderNames = [
+        'clickcoder', 'ClickCoder',
+        'zipple', 'Zipple',
+        'clickcode', 'ClickCode',
+        'click', 'Click',
+        'click-code-electron',
+        'zipply', 'Zipply'
+      ]
 
       const legacyDirs: string[] = []
       if (appDataParent && fs.existsSync(appDataParent)) {
         for (const name of legacyFolderNames) {
           const candidate = path.join(appDataParent, name)
-          if (fs.existsSync(candidate) && path.normalize(candidate).toLowerCase() !== path.normalize(currentUserData).toLowerCase()) {
-            legacyDirs.push(candidate)
+          if (fs.existsSync(candidate)) {
+            const normCandidate = path.resolve(candidate)
+            const normCurrent = path.resolve(currentUserData)
+            const isSame = process.platform === 'win32'
+              ? normCandidate.toLowerCase() === normCurrent.toLowerCase()
+              : normCandidate === normCurrent
+            if (!isSame && !legacyDirs.includes(normCandidate)) {
+              legacyDirs.push(normCandidate)
+            }
           }
         }
       }
 
-      // Add current userData folder and cwd as search origins for legacy filenames
-      legacyDirs.push(currentUserData)
-      if (process.cwd() && !legacyDirs.includes(process.cwd())) {
-        legacyDirs.push(process.cwd())
+      // Also check cwd if outside currentUserData
+      if (process.cwd()) {
+        const normCwd = path.resolve(process.cwd())
+        if (normCwd !== path.resolve(currentUserData) && !legacyDirs.includes(normCwd)) {
+          legacyDirs.push(normCwd)
+        }
       }
 
       const copyIfNotExists = (src: string, dest: string) => {
@@ -121,39 +233,134 @@ export class LocalStorageService {
 
       const targetStorageDir = this.getStorageDir()
       const targetSkillsDir = path.join(currentUserData, 'skills')
+      const targetChatsFile = path.join(targetStorageDir, 'chats.json')
+
+      if (!fs.existsSync(targetStorageDir)) {
+        fs.mkdirSync(targetStorageDir, { recursive: true })
+      }
 
       for (const legDir of legacyDirs) {
-        // 1. Storage json stores (config.json, appearance.json, chats.json, projects.json, kv_store.json)
         const legStorage = path.join(legDir, 'storage')
-        if (fs.existsSync(legStorage)) {
-          const storeNames = ['config.json', 'appearance.json', 'chats.json', 'projects.json', 'kv_store.json']
-          for (const sName of storeNames) {
-            copyIfNotExists(path.join(legStorage, sName), path.join(targetStorageDir, sName))
+
+        // 1. Migrate and Merge Chats
+        const legChatsFile = path.join(legStorage, 'chats.json')
+        if (fs.existsSync(legChatsFile)) {
+          try {
+            const rawLeg = fs.readFileSync(legChatsFile, 'utf8')
+            const incoming = JSON.parse(rawLeg)
+            if (Array.isArray(incoming) && incoming.length > 0) {
+              let existing: any[] = []
+              if (fs.existsSync(targetChatsFile)) {
+                try {
+                  const rawEx = fs.readFileSync(targetChatsFile, 'utf8')
+                  const parsed = JSON.parse(rawEx)
+                  if (Array.isArray(parsed)) existing = parsed
+                } catch {}
+              }
+
+              const merged = this._mergeChats(existing, incoming)
+              if (merged.length > existing.length) {
+                console.log(`[LocalStorageService] Merged ${incoming.length} chats from ${legDir} -> ${targetChatsFile} (total: ${merged.length})`)
+                if (fs.existsSync(targetChatsFile)) {
+                  this._createChatBackup(targetChatsFile, 'pre-migration')
+                }
+                this._atomicWriteSync(targetChatsFile, JSON.stringify(merged, null, 2))
+                this._memoryCache.set('chats', merged)
+              }
+            }
+          } catch (err) {
+            console.warn(`[LocalStorageService] Error merging chats from ${legDir}:`, err)
           }
         }
 
-        // 2. State JSON files (memory, persona, sessions, schedules)
-        const memoryAliases = ['zipple-memory.json', 'clickcoder-memory.json', 'clickcode-memory.json', 'click-memory.json']
+        // 2. Migrate and Merge Config
+        const legConfigFile = path.join(legStorage, 'config.json')
+        const targetConfigFile = path.join(targetStorageDir, 'config.json')
+        if (fs.existsSync(legConfigFile)) {
+          if (!fs.existsSync(targetConfigFile)) {
+            copyIfNotExists(legConfigFile, targetConfigFile)
+          } else {
+            try {
+              const legCfg = JSON.parse(fs.readFileSync(legConfigFile, 'utf8'))
+              const curCfg = JSON.parse(fs.readFileSync(targetConfigFile, 'utf8'))
+              let updated = false
+              if (!curCfg.apiKey && legCfg.apiKey) {
+                curCfg.apiKey = legCfg.apiKey
+                updated = true
+              }
+              if ((!curCfg.connectedProviders || curCfg.connectedProviders.length === 0) &&
+                  (legCfg.connectedProviders && legCfg.connectedProviders.length > 0)) {
+                curCfg.connectedProviders = legCfg.connectedProviders
+                updated = true
+              }
+              if (updated) {
+                this._atomicWriteSync(targetConfigFile, JSON.stringify(curCfg, null, 2))
+                this._memoryCache.set('config', curCfg)
+                console.log(`[LocalStorageService] Merged AI settings from ${legDir}`)
+              }
+            } catch {}
+          }
+        }
+
+        // 3. Migrate and Merge Projects
+        const legProjectsFile = path.join(legStorage, 'projects.json')
+        const targetProjectsFile = path.join(targetStorageDir, 'projects.json')
+        if (fs.existsSync(legProjectsFile)) {
+          if (!fs.existsSync(targetProjectsFile)) {
+            copyIfNotExists(legProjectsFile, targetProjectsFile)
+          } else {
+            try {
+              const legProjects = JSON.parse(fs.readFileSync(legProjectsFile, 'utf8'))
+              const curProjects = JSON.parse(fs.readFileSync(targetProjectsFile, 'utf8'))
+              if (Array.isArray(legProjects) && Array.isArray(curProjects)) {
+                const existingPaths = new Set(curProjects.map((p: any) => p?.path || p))
+                let added = false
+                for (const p of legProjects) {
+                  const pPath = p?.path || p
+                  if (pPath && !existingPaths.has(pPath)) {
+                    curProjects.push(p)
+                    existingPaths.add(pPath)
+                    added = true
+                  }
+                }
+                if (added) {
+                  this._atomicWriteSync(targetProjectsFile, JSON.stringify(curProjects, null, 2))
+                  this._memoryCache.set('projects', curProjects)
+                  console.log(`[LocalStorageService] Merged projects from ${legDir}`)
+                }
+              }
+            } catch {}
+          }
+        }
+
+        // 4. Migrate other storage stores (appearance, mcp_servers, kv_store)
+        const otherStores = ['appearance.json', 'mcp_servers.json', 'kv_store.json']
+        for (const sName of otherStores) {
+          copyIfNotExists(path.join(legStorage, sName), path.join(targetStorageDir, sName))
+        }
+
+        // 5. State JSON files (memory, persona, sessions, schedules)
+        const memoryAliases = ['zipply-memory.json', 'zipple-memory.json', 'clickcoder-memory.json', 'clickcode-memory.json', 'click-memory.json']
         for (const alias of memoryAliases) {
           copyIfNotExists(path.join(legDir, alias), path.join(currentUserData, 'zipply-memory.json'))
         }
 
-        const personaAliases = ['zipple-persona.json', 'clickcoder-persona.json', 'clickcode-persona.json', 'click-persona.json']
+        const personaAliases = ['zipply-persona.json', 'zipple-persona.json', 'clickcoder-persona.json', 'clickcode-persona.json', 'click-persona.json']
         for (const alias of personaAliases) {
           copyIfNotExists(path.join(legDir, alias), path.join(currentUserData, 'zipply-persona.json'))
         }
 
-        const sessionAliases = ['zipple-sessions.json', 'clickcoder-sessions.json', 'clickcode-sessions.json', 'click-sessions.json']
+        const sessionAliases = ['zipply-sessions.json', 'zipple-sessions.json', 'clickcoder-sessions.json', 'clickcode-sessions.json', 'click-sessions.json']
         for (const alias of sessionAliases) {
           copyIfNotExists(path.join(legDir, alias), path.join(currentUserData, 'zipply-sessions.json'))
         }
 
-        const scheduleAliases = ['zipple-schedules.json', 'clickcoder-schedules.json', 'clickcode-schedules.json', 'click-schedules.json']
+        const scheduleAliases = ['zipply-schedules.json', 'zipple-schedules.json', 'clickcoder-schedules.json', 'clickcode-schedules.json', 'click-schedules.json']
         for (const alias of scheduleAliases) {
           copyIfNotExists(path.join(legDir, alias), path.join(currentUserData, 'zipply-schedules.json'))
         }
 
-        // 3. Skills folder
+        // 6. Skills folder
         const legSkills = path.join(legDir, 'skills')
         if (fs.existsSync(legSkills)) {
           copyDirRecursiveIfNotExists(legSkills, targetSkillsDir)
@@ -166,13 +373,15 @@ export class LocalStorageService {
 
   /**
    * Root directory for all zipply persistent stores.
-   * - Windows: %APPDATA%\zipply\storage
+   * - Windows: %APPDATA%\Zipply\storage
    * - Linux: ~/.config/zipply/storage
-   * - macOS: ~/Library/Application Support/zipply/storage
+   * - macOS: ~/Library/Application Support/Zipply/storage
    */
   static getStorageDir(): string {
     if (!this._storageDir) {
-      const baseDir = app ? app.getPath('userData') : (process.env.APPDATA || process.env.HOME || process.cwd())
+      const baseDir = app && typeof app.getPath === 'function'
+        ? app.getPath('userData')
+        : this.getCanonicalUserDataDir()
       this._storageDir = path.join(baseDir, 'storage')
     }
     return this._storageDir
@@ -183,18 +392,13 @@ export class LocalStorageService {
    */
   static getDefaultProjectsDir(): string {
     const isWin = process.platform === 'win32'
-    const home = app ? app.getPath('home') : (process.env.USERPROFILE || process.env.HOME || 'd:/')
+    const home = process.env.USERPROFILE || process.env.HOME || (app && typeof app.getPath === 'function' ? app.getPath('home') : 'd:/')
 
     if (isWin) {
-      // If D:\ drive exists on Windows, check for D:/zipplyprojects, D:/zippleprojects, etc.
       try {
         if (fs.existsSync('D:/') || fs.existsSync('d:/')) {
           if (fs.existsSync('d:/zipplyprojects')) return path.normalize('d:/zipplyprojects')
           if (fs.existsSync('d:/ZipplyProjects')) return path.normalize('d:/ZipplyProjects')
-          if (fs.existsSync('d:/zippleprojects')) return path.normalize('d:/zippleprojects')
-          if (fs.existsSync('d:/ZippleProjects')) return path.normalize('d:/ZippleProjects')
-          if (fs.existsSync('d:/clickprojects')) return path.normalize('d:/clickprojects')
-          if (fs.existsSync('d:/ClickProjects')) return path.normalize('d:/ClickProjects')
           return path.normalize('d:/zipplyprojects')
         }
       } catch {}
@@ -209,8 +413,8 @@ export class LocalStorageService {
    * Returns complete system and path information.
    */
   static getSystemPathsInfo(): SystemPathsInfo {
-    const home = app ? app.getPath('home') : (process.env.HOME || process.env.USERPROFILE || '')
-    const userData = app ? app.getPath('userData') : (process.env.APPDATA || '')
+    const home = process.env.USERPROFILE || process.env.HOME || (app && typeof app.getPath === 'function' ? app.getPath('home') : os.homedir())
+    const userData = app && typeof app.getPath === 'function' ? app.getPath('userData') : this.getCanonicalUserDataDir()
     return {
       platform: process.platform,
       homeDir: home,
@@ -322,11 +526,23 @@ export class LocalStorageService {
    * Save store data (synchronous or debounced).
    */
   static setStore<T = any>(storeName: StoreName | string, data: T, debounceMs = 0): void {
+    // Guard against destructive overwrite of existing chat history with empty array
+    if (storeName === 'chats' && Array.isArray(data) && data.length === 0) {
+      const existing = this.getStore<any[]>('chats', [])
+      if (Array.isArray(existing) && existing.length > 1) {
+        console.warn(`[LocalStorageService] Blocked attempt to overwrite ${existing.length} existing chats with empty array []`)
+        return
+      }
+    }
+
     this._memoryCache.set(storeName, data)
 
     const doWrite = (): void => {
       try {
         const filePath = this._getStoreFilePath(storeName)
+        if (storeName === 'chats' && Array.isArray(data) && data.length > 0) {
+          this._createChatBackup(filePath, 'auto')
+        }
         const jsonStr = JSON.stringify(data, null, 2)
         this._atomicWriteSync(filePath, jsonStr)
       } catch (err) {

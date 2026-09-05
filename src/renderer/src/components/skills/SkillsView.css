@@ -837,21 +837,6 @@
   border-radius: 9999px;
 }
 
-.skills-vector-active-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 10.5px;
-  font-weight: 550;
-  color: #34D399;
-  background-color: rgba(16, 185, 129, 0.14);
-  border: 1px solid rgba(16, 185, 129, 0.28);
-  padding: 2px 7px;
-  border-radius: 9999px;
-  white-space: nowrap;
-  user-select: none;
-  line-height: 1.2;
-}
 
 .skills-search-spinning-icon {
   animation: spinAround 1s linear infinite;

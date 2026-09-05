@@ -153,7 +153,14 @@ export const ToolStrategyProvider: PromptSectionProvider = {
 - In PowerShell, declare arrays as \`@(item1, item2)\`, NEVER \`[item1, item2]\`.
 - In ESM projects (\`"type": "module"\`), run Node scripts with \`.mjs\` or ES imports.
 - NEVER run destructive commands (\`rm -rf\`, \`Remove-Item -Recurse -Force\`, \`git reset --hard\`, \`del /s /q\`) — use \`file\` tool actions instead.
-- For background services / dev watchers, use \`terminal(action="start_background", command="...")\`.
+
+## IDE Terminals & Background Process Awareness:
+- You have direct access and visibility into all open terminal tabs in the IDE (both AI-launched and user interactive tabs).
+- When the user asks you to check something in the terminal, inspect what they typed, check build/test errors, or verify a server:
+  1. Call \`terminal(action="read_terminal")\` to read recent commands, user inputs, outputs, and exit codes (reads the active terminal, or pass \`session_id="all"\` or specific ID).
+  2. Call \`terminal(action="list_terminals")\` to see all open IDE terminal tabs, their status (RUNNING / IDLE), PID, and CWD.
+  3. Call \`terminal(action="send_input", session_id="...", input="...")\` to send stdin input into running terminal programs.
+  4. For background daemons / dev watchers, use \`terminal(action="start_background", command="...")\`.
 </tool_guidelines>`
   }
 }

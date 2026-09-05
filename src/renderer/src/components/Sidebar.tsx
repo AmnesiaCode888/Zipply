@@ -42,6 +42,8 @@ interface SidebarProps {
   onNewSkill?: () => void
   isSettingsOpen?: boolean
   activeSettingsTab?: SettingsTab
+  width?: number
+  onResize?: (width: number) => void
   onSelectSettingsTab?: (tab: SettingsTab) => void
   onOpenSettings?: (tab?: SettingsTab) => void
   onCloseSettings?: () => void
@@ -63,6 +65,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeChatId,
   activeNavTab = 'dialogs',
   selectedNotesCategory = 'all',
+  width = 260,
+  onResize,
   onSelectNavTab,
   onSelectNotesCategory,
   onSelectChat,
@@ -77,6 +81,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenSettings,
   onCloseSettings
 }) => {
+  const isDraggingRef = React.useRef<boolean>(false)
+  const startXRef = React.useRef<number>(0)
+  const startWidthRef = React.useRef<number>(260)
+
+  const handleStartResize = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      isDraggingRef.current = true
+      startXRef.current = e.clientX
+      startWidthRef.current = width || 260
+
+      document.body.classList.add('is-resizing-sidebar')
+
+      const handleMouseMove = (ev: MouseEvent) => {
+        if (!isDraggingRef.current) return
+        const deltaX = ev.clientX - startXRef.current
+        const rawNewWidth = startWidthRef.current + deltaX
+        const minW = 200
+        const rightPanelEl = document.querySelector('.right-panel-container.open') as HTMLElement | null
+        const currentRightPanelW = rightPanelEl ? rightPanelEl.offsetWidth : 0
+        const maxW = Math.max(minW, Math.min(window.innerWidth - currentRightPanelW - 380, 460))
+        const clamped = Math.max(minW, Math.min(rawNewWidth, maxW))
+        onResize?.(clamped)
+      }
+
+      const handleMouseUp = () => {
+        isDraggingRef.current = false
+        document.body.classList.remove('is-resizing-sidebar')
+        window.removeEventListener('mousemove', handleMouseMove)
+        window.removeEventListener('mouseup', handleMouseUp)
+      }
+
+      window.addEventListener('mousemove', handleMouseMove)
+      window.addEventListener('mouseup', handleMouseUp)
+    },
+    [width, onResize]
+  )
   const [chatSearch, setChatSearch] = useState('')
 
   const filteredChats = useMemo(() => {
@@ -166,7 +208,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }
 
   return (
-    <aside className={`sidebar-container ${isOpen ? 'open' : 'closed'}`} aria-label="Sidebar navigation">
+    <aside
+      className={`sidebar-container ${isOpen ? 'open' : 'closed'}`}
+      style={isOpen && width ? { width } : undefined}
+      aria-label="Sidebar navigation"
+    >
       <div className="sidebar-inner">
         {/* Sidebar Header (60px) */}
         <div className="sidebar-header">
@@ -390,6 +436,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
       </div>
+      <div
+        className="sidebar-resizer"
+        onMouseDown={handleStartResize}
+        title="Перетащите для изменения ширины"
+      />
     </aside>
   )
 }

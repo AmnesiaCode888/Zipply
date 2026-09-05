@@ -3,9 +3,27 @@ import path from 'path'
 import * as fs from 'fs'
 import { ToolBase, ToolParameterDef, ToolResult, ProgressCallback } from './ToolBase'
 import { Blackboard } from '../core/Blackboard'
+import { TerminalSessionManager } from '../../services/TerminalSessionManager'
 
 function stripAnsi(text: string): string {
   return text.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '')
+}
+
+function notifyRenderer(channel: string, data: any): void {
+  try {
+    const electron = require('electron')
+    const BrowserWindow = electron.BrowserWindow || electron.remote?.BrowserWindow
+    if (BrowserWindow && typeof BrowserWindow.getAllWindows === 'function') {
+      const windows = BrowserWindow.getAllWindows()
+      for (const win of windows) {
+        if (!win.isDestroyed() && win.webContents) {
+          win.webContents.send(channel, data)
+        }
+      }
+    }
+  } catch {
+    // In headless test environments, safely no-op
+  }
 }
 
 export interface ManagedProcess {
@@ -121,7 +139,7 @@ export class TerminalTool extends ToolBase {
   }
 
   get description(): string {
-    return 'Execute shell commands in the terminal or manage background process lifecycle (start_background, list_processes, get_logs, send_input, kill).'
+    return 'Execute shell commands in the terminal, inspect open IDE terminal tabs/history (including what the user typed), and manage background process lifecycle (run, list_terminals, read_terminal, start_background, list_processes, get_logs, send_input, kill).'
   }
 
   getExecutionPolicy(): { mutates: boolean; parallelSafe: boolean; cacheable: boolean } {
@@ -140,9 +158,18 @@ export class TerminalTool extends ToolBase {
       action: {
         type: 'string',
         description:
-          'Action: run (default if command is provided, executes and waits for output), start_background (long-running server/watcher), list_processes, get_logs, send_input, kill',
+          'Action: run (default, executes shell command), list_terminals (list all open IDE terminal tabs & status), read_terminal (read command history/output/user input from open terminal), start_background (long-running server/watcher), list_processes, get_logs, send_input, kill',
         required: false,
-        enum: ['run', 'start_background', 'list_processes', 'get_logs', 'send_input', 'kill']
+        enum: [
+          'run',
+          'list_terminals',
+          'read_terminal',
+          'start_background',
+          'list_processes',
+          'get_logs',
+          'send_input',
+          'kill'
+        ]
       },
       command: {
         type: 'string',
@@ -154,6 +181,12 @@ export class TerminalTool extends ToolBase {
         description: 'Working directory for command execution (absolute or relative to workspace)',
         required: false
       },
+      session_id: {
+        type: 'string',
+        description:
+          '[For read_terminal, send_input, run] IDE terminal tab ID (e.g. "term_1", "term_ai_..."), or "active" (default), or "all"',
+        required: false
+      },
       timeout: {
         type: 'integer',
         description: '[For run] Execution timeout in seconds (default: 120, max: 600)',
@@ -161,7 +194,7 @@ export class TerminalTool extends ToolBase {
       },
       process_id: {
         type: 'string',
-        description: '[Required for get_logs, send_input, kill] Background process ID (e.g. bg_1) or PID',
+        description: '[Required for get_logs, kill; optional for send_input] Background process ID (e.g. bg_1) or PID',
         required: false
       },
       input: {
@@ -171,7 +204,7 @@ export class TerminalTool extends ToolBase {
       },
       lines: {
         type: 'integer',
-        description: '[For get_logs] Number of recent log lines to return (default: 100)',
+        description: '[For get_logs, read_terminal] Number of recent log lines to return (default: 100)',
         required: false
       }
     }
@@ -215,7 +248,12 @@ export class TerminalTool extends ToolBase {
           /\b(del|erase|rd|rmdir)\b.*\/(s|q)\b/,
           /\bgit\s+reset\s+--hard\b/,
           /\bgit\s+clean\s+-[^\n]*f/,
-          /\bgit\s+push\s+[^\n]*--force(?:-with-lease)?\b/
+          /\bgit\s+push\s+[^\n]*--force(?:-with-lease)?\b/,
+          /\b(powershell|pwsh)\b.*-(?:enc|encodedcommand)\b/i,
+          /\b(frombase64string)\b/i,
+          /\b(iex|invoke-expression)\b/i,
+          /\bnode\s+-(?:e|eval)\b.*(rmSync|unlinkSync|rmdirSync)/i,
+          /\bpython(?:3)?\s+-c\b.*(rmtree|unlink|remove)/i
         ]
       : [
           /(^|[;&|])\s*rm\s+-[^\n]*r[^\n]*f\b/,
@@ -224,7 +262,10 @@ export class TerminalTool extends ToolBase {
           /\bgit\s+push\s+[^\n]*--force(?:-with-lease)?\b/,
           /\b(mkfs|shutdown|reboot)\b/,
           /\bdd\s+if=/,
-          /\bcurl\b[^\n|]*\|\s*(sh|bash)\b/
+          /\bcurl\b[^\n|]*\|\s*(sh|bash)\b/,
+          /\bwget\b[^\n|]*\|\s*(sh|bash)\b/,
+          /\bpython(?:3)?\s+-c\b.*(rmtree|unlink|remove)/i,
+          /\bnode\s+-(?:e|eval)\b.*(rmSync|unlinkSync|rmdirSync)/i
         ]
 
     if (dangerousPatterns.some((pattern) => pattern.test(normalized))) {
@@ -289,6 +330,10 @@ export class TerminalTool extends ToolBase {
       switch (action) {
         case 'run':
           return await this._handleRun(args, runCwd, abortSignal, onProgress)
+        case 'list_terminals':
+          return await this._handleListTerminals()
+        case 'read_terminal':
+          return await this._handleReadTerminal(args)
         case 'start_background':
           return await this._handleStartBackground(args, runCwd, blackboard)
         case 'list_processes':
@@ -358,6 +403,12 @@ export class TerminalTool extends ToolBase {
         onProgress?.({ message: msg, elapsedSeconds })
       }, 1000)
 
+      const runId = `ai_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+      const targetSessionId = args.session_id || `term_ai_${runId}`
+      const sessionManager = TerminalSessionManager.getInstance()
+
+      notifyRenderer('terminal:ai:start', { runId, command, cwd: runCwd })
+
       const child = exec(
         cmdToRun,
         {
@@ -372,6 +423,10 @@ export class TerminalTool extends ToolBase {
           if (onAbort && abortSignal) {
             abortSignal.removeEventListener('abort', onAbort)
           }
+
+          const exitCode = error ? ((error as any).code ?? 1) : 0
+          sessionManager.recordCommandExit(runId, exitCode)
+          notifyRenderer('terminal:ai:exit', { runId, code: exitCode })
 
           const combined = (stdout || '') + (stderr ? `\n[STDERR]\n${stderr}` : '')
           let cleanOutput = stripAnsi(combined).trim()
@@ -398,15 +453,34 @@ export class TerminalTool extends ToolBase {
         }
       )
 
+      sessionManager.recordCommandStart({
+        sessionId: targetSessionId,
+        runId,
+        command,
+        cwd: runCwd,
+        initiator: 'ai',
+        pid: child.pid
+      })
+
       if (child.stdout) {
         child.stdout.on('data', (chunk) => {
           bytesReceived += chunk ? chunk.length : 0
+          const text = stripAnsi(chunk ? chunk.toString('utf8') : '')
+          if (text) {
+            sessionManager.appendOutput(runId, text)
+            notifyRenderer('terminal:ai:data', { runId, text })
+          }
         })
       }
 
       if (child.stderr) {
         child.stderr.on('data', (chunk) => {
           bytesReceived += chunk ? chunk.length : 0
+          const text = stripAnsi(chunk ? chunk.toString('utf8') : '')
+          if (text) {
+            sessionManager.appendOutput(runId, text)
+            notifyRenderer('terminal:ai:data', { runId, text })
+          }
         })
       }
 
@@ -494,11 +568,26 @@ export class TerminalTool extends ToolBase {
       bytesReceived: 0
     }
 
+    const sessionManager = TerminalSessionManager.getInstance()
+    sessionManager.recordCommandStart({
+      sessionId: `term_ai_${id}`,
+      runId: id,
+      command,
+      cwd: runCwd,
+      initiator: 'ai',
+      child,
+      pid: child.pid
+    })
+
+    notifyRenderer('terminal:ai:start', { runId: id, command, cwd: runCwd, isBackground: true })
+
     const appendLog = (data: Buffer | string): void => {
       if (!data) return
       const clean = stripAnsi(data.toString())
       procObj.bytesReceived += clean.length
       procObj.lastActivityAt = Date.now()
+      sessionManager.appendOutput(id, clean)
+      notifyRenderer('terminal:ai:data', { runId: id, text: clean })
       const lines = clean.split(/\r?\n/)
       for (const line of lines) {
         if (line.trim().length > 0) {
@@ -517,12 +606,16 @@ export class TerminalTool extends ToolBase {
       procObj.status = 'exited'
       procObj.exitCode = code !== null ? code : signal
       procObj.lastActivityAt = Date.now()
+      sessionManager.recordCommandExit(id, procObj.exitCode as number | null)
+      notifyRenderer('terminal:ai:exit', { runId: id, code: procObj.exitCode })
     })
 
     child.on('error', (err) => {
       procObj.status = 'exited'
       procObj.lastActivityAt = Date.now()
       procObj.logs.push(`[SYSTEM ERROR]: ${err.message}`)
+      sessionManager.recordCommandExit(id, 1)
+      notifyRenderer('terminal:ai:exit', { runId: id, code: 1 })
     })
 
     registry.add(id, procObj)
@@ -583,26 +676,67 @@ export class TerminalTool extends ToolBase {
     }
   }
 
+  private async _handleListTerminals(): Promise<ToolResult> {
+    const sessionManager = TerminalSessionManager.getInstance()
+    const content = sessionManager.listTerminals()
+    return {
+      formattedContent: content,
+      data: {
+        sessions: sessionManager.getAllSessions().map((s) => ({
+          id: s.id,
+          name: s.name,
+          isRunning: s.isRunning,
+          cwd: s.cwd,
+          activePid: s.activePid,
+          entriesCount: s.entries.length
+        }))
+      }
+    }
+  }
+
+  private async _handleReadTerminal(args: any): Promise<ToolResult> {
+    const sessionManager = TerminalSessionManager.getInstance()
+    const targetSessionId = args.session_id || args.process_id
+    const lines = Number(args.lines) || 120
+    const content = sessionManager.readTerminalOutput(targetSessionId, lines)
+    return {
+      formattedContent: content,
+      data: { sessionId: targetSessionId || 'active', lines }
+    }
+  }
+
   private async _handleSendInput(args: any, blackboard: Blackboard): Promise<ToolResult> {
-    const procId = args.process_id
-    if (!procId) {
-      return { formattedContent: 'Error: process_id parameter is required for send_input action.' }
+    const targetId = args.session_id || args.process_id
+    if (!targetId) {
+      return { formattedContent: 'Error: session_id or process_id parameter is required for send_input action.' }
     }
 
-    const proc = registry.get(procId, this._getWorkspaceRoot(blackboard))
+    const inputStr = args.input !== undefined ? String(args.input) : ''
+
+    // 1. Try sending input to active interactive terminal process
+    const sessionManager = TerminalSessionManager.getInstance()
+    const termResult = sessionManager.sendInput(targetId, inputStr)
+    if (termResult.success) {
+      return { formattedContent: `Successfully sent input to terminal process '${targetId}':\n${inputStr}` }
+    }
+
+    // 2. Fall back to ProcessRegistry background process
+    const proc = registry.get(targetId, this._getWorkspaceRoot(blackboard))
     if (!proc) {
-      return { formattedContent: `Error: process '${procId}' not found in registry.` }
+      return {
+        formattedContent: `Error: neither active terminal nor background process found for ID '${targetId}'. ${termResult.message}`
+      }
     }
 
     if (proc.status !== 'running' || !proc.child.stdin || proc.child.stdin.destroyed) {
       return { formattedContent: `Error: process ${proc.id} is not running or stdin is closed.` }
     }
 
-    const inputStr = args.input !== undefined ? String(args.input) : ''
     const textToSend = inputStr.endsWith('\n') ? inputStr : inputStr + '\n'
 
     try {
       proc.child.stdin.write(textToSend, 'utf8')
+      sessionManager.appendOutput(proc.id, `[stdin]: ${inputStr}`)
       return { formattedContent: `Successfully sent input to process ${proc.id}:\n${inputStr}` }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)

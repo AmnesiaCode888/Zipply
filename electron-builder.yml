@@ -24,6 +24,7 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Zipply
+  deleteAppDataOnUninstall: false
 
 linux:
   target:
@@ -38,8 +39,6 @@ linux:
 
 deb:
   depends:
-    - gconf2
-    - gconf-service
     - libnotify4
     - libappindicator1
     - libxtst6

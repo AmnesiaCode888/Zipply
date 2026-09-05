@@ -1,20 +1,48 @@
 .sidebar-container {
   height: 100vh;
+  position: relative;
   background-color: var(--bg-sidebar, #121212);
   border-right: 1px solid var(--border-subtle, #1E1E1E);
-  overflow: hidden;
+  overflow: visible;
   flex-shrink: 0;
-  transition: width 0.22s cubic-bezier(0.16, 1, 0.3, 1),
-              min-width 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+  transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              min-width 0.2s cubic-bezier(0.16, 1, 0.3, 1),
               opacity 0.18s ease,
               background-color 0.2s ease,
               border-color 0.2s ease;
   user-select: none;
 }
 
+body.is-resizing-sidebar .sidebar-container {
+  transition: none !important;
+}
+
+body.is-resizing-sidebar,
+body.is-resizing-sidebar * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+/* ─── Sidebar Resizer Handle ─── */
+.sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 50;
+  transition: background-color 0.15s ease;
+}
+
+.sidebar-resizer:hover,
+body.is-resizing-sidebar .sidebar-resizer {
+  background-color: rgba(255, 255, 255, 0.22);
+}
+
 .sidebar-container.closed {
-  width: 0;
-  min-width: 0;
+  width: 0 !important;
+  min-width: 0 !important;
   opacity: 0;
   pointer-events: none;
   border-right-color: transparent;
@@ -22,13 +50,14 @@
 
 .sidebar-container.open {
   width: 260px;
-  min-width: 260px;
+  min-width: 200px;
+  max-width: 460px;
   opacity: 1;
   pointer-events: auto;
 }
 
 .sidebar-inner {
-  width: 260px;
+  width: 100%;
   height: 100vh;
   display: flex;
   flex-direction: column;

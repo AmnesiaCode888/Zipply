@@ -735,13 +735,15 @@ body,
   flex-direction: column;
   flex: 1;
   height: 100vh;
-  min-width: 0;
+  min-width: 380px;
   overflow: hidden;
   background-color: var(--bg-primary);
 }
 
 .app-content {
   flex: 1;
+  min-height: 0;
+  width: 100%;
   overflow: hidden;
   background-color: var(--bg-primary);
   display: flex;

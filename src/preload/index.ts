@@ -140,6 +140,62 @@ const api = {
     exportBackup: () => ipcRenderer.invoke('storage:exportBackup'),
     importBackup: () => ipcRenderer.invoke('storage:importBackup')
   },
+  files: {
+    readDir: (dirPath: string) => ipcRenderer.invoke('files:readDir', dirPath),
+    createFile: (filePath: string) => ipcRenderer.invoke('files:createFile', filePath),
+    createDir: (dirPath: string) => ipcRenderer.invoke('files:createDir', dirPath),
+    rename: (oldPath: string, newPath: string) => ipcRenderer.invoke('files:rename', { oldPath, newPath }),
+    move: (sourcePath: string, targetDirPath: string) => ipcRenderer.invoke('files:move', { sourcePath, targetDirPath }),
+    delete: (targetPath: string) => ipcRenderer.invoke('files:delete', targetPath),
+    reveal: (targetPath: string) => ipcRenderer.invoke('files:reveal', targetPath)
+  },
+  terminal: {
+    run: (params: { runId: string; command: string; cwd?: string; sessionId?: string }) =>
+      ipcRenderer.send('terminal:run', params),
+    sendInput: (params: { targetId: string; input: string }) =>
+      ipcRenderer.invoke('terminal:sendInput', params),
+    syncSessions: (sessions: any[], activeSessionId?: string) =>
+      ipcRenderer.send('terminal:syncSessions', { sessions, activeSessionId }),
+    kill: (runId?: string) =>
+      ipcRenderer.invoke('terminal:kill', { runId }),
+    getDefaultCwd: () =>
+      ipcRenderer.invoke('terminal:getDefaultCwd'),
+    onData: (callback: (data: { runId: string; text: string; stream: 'stdout' | 'stderr' }) => void) => {
+      const listener = (_: any, data: any) => callback(data)
+      ipcRenderer.on('terminal:data', listener)
+      return () => {
+        ipcRenderer.removeListener('terminal:data', listener)
+      }
+    },
+    onExit: (callback: (data: { runId: string; code: number }) => void) => {
+      const listener = (_: any, data: any) => callback(data)
+      ipcRenderer.on('terminal:exit', listener)
+      return () => {
+        ipcRenderer.removeListener('terminal:exit', listener)
+      }
+    },
+    onAiStart: (callback: (data: { runId: string; command: string; cwd: string; isBackground?: boolean }) => void) => {
+      const listener = (_: any, data: any) => callback(data)
+      ipcRenderer.on('terminal:ai:start', listener)
+      return () => {
+        ipcRenderer.removeListener('terminal:ai:start', listener)
+      }
+    },
+    onAiData: (callback: (data: { runId: string; text: string }) => void) => {
+      const listener = (_: any, data: any) => callback(data)
+      ipcRenderer.on('terminal:ai:data', listener)
+      return () => {
+        ipcRenderer.removeListener('terminal:ai:data', listener)
+      }
+    },
+    onAiExit: (callback: (data: { runId: string; code?: number | null }) => void) => {
+      const listener = (_: any, data: any) => callback(data)
+      ipcRenderer.on('terminal:ai:exit', listener)
+      return () => {
+        ipcRenderer.removeListener('terminal:ai:exit', listener)
+      }
+    }
+  },
   setZoomFactor: (factor: number) => {
     try {
       webFrame.setZoomFactor(factor)

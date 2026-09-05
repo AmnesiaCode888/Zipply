@@ -5,6 +5,11 @@ import { basenamePath } from '../utils/projects'
 const PROJECTS_STORAGE_KEY = 'zipply_projects'
 const MAX_RECENT = 20
 
+function normalizeProjectPath(p: string): string {
+  if (!p) return p
+  return p.replace(/([dD]:[\\/])(?:clickprojects|zippleprojects)/gi, '$1zipplyprojects')
+}
+
 function getStoredProjects(): ProjectRef[] {
   try {
     const saved = localStorage.getItem(PROJECTS_STORAGE_KEY) ||
@@ -17,11 +22,14 @@ function getStoredProjects(): ProjectRef[] {
       if (Array.isArray(parsed)) {
         return parsed
           .filter((p) => p && p.path)
-          .map((p) => ({
-            name: p.name || basenamePath(p.path),
-            path: p.path,
-            lastUsedAt: p.lastUsedAt
-          }))
+          .map((p) => {
+            const cleanPath = normalizeProjectPath(p.path)
+            return {
+              name: p.name || basenamePath(cleanPath),
+              path: cleanPath,
+              lastUsedAt: p.lastUsedAt
+            }
+          })
       }
     }
   } catch {
@@ -59,9 +67,19 @@ export function useProjects(): UseProjectsReturn {
         .getStore<ProjectRef[]>('projects')
         .then((fileProjects) => {
           if (Array.isArray(fileProjects) && fileProjects.length > 0) {
-            setRecent(fileProjects)
+            const normalized = fileProjects
+              .filter((p) => p && p.path)
+              .map((p) => {
+                const cleanPath = normalizeProjectPath(p.path)
+                return {
+                  name: p.name || basenamePath(cleanPath),
+                  path: cleanPath,
+                  lastUsedAt: p.lastUsedAt
+                }
+              })
+            setRecent(normalized)
             try {
-              localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(fileProjects))
+              localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(normalized))
             } catch {}
           }
         })
@@ -82,7 +100,7 @@ export function useProjects(): UseProjectsReturn {
             if (saved) {
               const parsed = JSON.parse(saved)
               if (parsed?.baseDir && typeof parsed.baseDir === 'string' && parsed.baseDir.trim()) {
-                setBaseDir(parsed.baseDir.trim())
+                setBaseDir(normalizeProjectPath(parsed.baseDir.trim()))
                 return
               }
             }

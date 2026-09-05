@@ -57,6 +57,7 @@ export const ModelsSettings: React.FC = () => {
   const [formBaseUrl, setFormBaseUrl] = useState('https://api.deepseek.com/v1')
   const [formApiKey, setFormApiKey] = useState('')
   const [formModel, setFormModel] = useState('')
+  const [formFastModel, setFormFastModel] = useState('')
   const [formEmbeddingModel, setFormEmbeddingModel] = useState('')
   const [formEmbeddingBaseUrl, setFormEmbeddingBaseUrl] = useState('')
   const [showEmbeddingAdvanced, setShowEmbeddingAdvanced] = useState(false)
@@ -125,6 +126,7 @@ export const ModelsSettings: React.FC = () => {
     setFormBaseUrl(preset.defaultBaseUrl)
     setFormApiKey('')
     setFormModel('')
+    setFormFastModel('')
     setFormEmbeddingModel(preset.defaultEmbeddingModel || '')
     setFormEmbeddingBaseUrl('')
     setShowEmbeddingAdvanced(false)
@@ -141,6 +143,7 @@ export const ModelsSettings: React.FC = () => {
     setFormBaseUrl(prov.baseUrl)
     setFormApiKey(prov.apiKey)
     setFormModel(prov.model || '')
+    setFormFastModel(prov.fastModel || '')
     setFormEmbeddingModel(prov.embeddingModel || '')
     setFormEmbeddingBaseUrl(prov.embeddingBaseUrl || '')
     setShowEmbeddingAdvanced(Boolean(prov.embeddingBaseUrl))
@@ -162,6 +165,7 @@ export const ModelsSettings: React.FC = () => {
     setFormBaseUrl(discovered?.baseUrl || preset.defaultBaseUrl)
     setFormApiKey('')
     setFormModel(discovered?.models?.[0] || '')
+    setFormFastModel('')
     setFormEmbeddingModel(preset.defaultEmbeddingModel || '')
     setFormEmbeddingBaseUrl('')
     setShowEmbeddingAdvanced(false)
@@ -225,6 +229,8 @@ export const ModelsSettings: React.FC = () => {
       return
     }
 
+    const resolvedFastModel = formFastModel.trim() || formModel.trim()
+
     if (editingId) {
       updateConnectedProvider(editingId, {
         providerId: formPreset,
@@ -232,7 +238,7 @@ export const ModelsSettings: React.FC = () => {
         baseUrl: formBaseUrl.trim(),
         apiKey: formApiKey.trim(),
         model: formModel.trim(),
-        fastModel: formModel.trim(),
+        fastModel: resolvedFastModel,
         embeddingModel: formEmbeddingModel.trim() || undefined,
         embeddingBaseUrl: formEmbeddingBaseUrl.trim() || undefined,
         models: fetchedModels.length > 0 ? fetchedModels : [formModel.trim()],
@@ -245,7 +251,7 @@ export const ModelsSettings: React.FC = () => {
         baseUrl: formBaseUrl.trim(),
         apiKey: formApiKey.trim(),
         model: formModel.trim(),
-        fastModel: formModel.trim(),
+        fastModel: resolvedFastModel,
         embeddingModel: formEmbeddingModel.trim() || undefined,
         embeddingBaseUrl: formEmbeddingBaseUrl.trim() || undefined,
         models: fetchedModels.length > 0 ? fetchedModels : [formModel.trim()],
@@ -549,6 +555,62 @@ export const ModelsSettings: React.FC = () => {
             </div>
           )}
 
+          {/* 4.5. Fast Model (Watchdog, Summaries, Titles) */}
+          <div className="models-input-block">
+            <div className="input-label-row">
+              <div className="input-label-with-badge">
+                <label htmlFor="form-fast-model" className="input-label-title">
+                  Быстрая модель (Fast Model)
+                </label>
+                <span className="vector-model-pill">Сторож и фоновые задачи</span>
+              </div>
+            </div>
+
+            {/* Quick Preset Chips for Fast Models */}
+            <div className="embedding-preset-chips-row">
+              <span className="embedding-chips-title">Быстрый выбор:</span>
+              {[
+                'deepseek/deepseek-v4-flash-0731',
+                'inception/mercury-2.5-preview'
+              ].map((fastPreset) => (
+                <button
+                  key={fastPreset}
+                  type="button"
+                  className={`embedding-chip-btn ${formFastModel === fastPreset ? 'active' : ''}`}
+                  onClick={() => setFormFastModel(fastPreset)}
+                >
+                  <span>{fastPreset}</span>
+                  {formFastModel === fastPreset && <Check size={11} />}
+                </button>
+              ))}
+              {formFastModel && (
+                <button
+                  type="button"
+                  className="embedding-chip-btn"
+                  onClick={() => setFormFastModel('')}
+                  title="Использовать основную модель"
+                >
+                  <span>Основная ({formModel || 'по умолчанию'})</span>
+                </button>
+              )}
+            </div>
+
+            <div className="input-field-container">
+              <input
+                id="form-fast-model"
+                type="text"
+                className="input-field-control"
+                placeholder={formModel ? `По умолчанию: ${formModel}` : 'Например: deepseek/deepseek-v4-flash-0731 или inception/mercury-2.5-preview'}
+                value={formFastModel}
+                onChange={(e) => setFormFastModel(e.target.value)}
+                spellCheck={false}
+              />
+            </div>
+            <p className="field-hint-caption" style={{ marginTop: '6px', fontSize: '11px', color: 'rgba(255, 255, 255, 0.45)' }}>
+              Используется для Watchdog, генерации заголовков и резюме сессий. Можно ввести любую модель или выбрать из рекомендаций. Если не указана, используется основная.
+            </p>
+          </div>
+
           {/* 5. Embedding / Vector Model Selection */}
           <div className="models-input-block">
             <div className="input-label-row">
@@ -734,6 +796,7 @@ export const ModelsSettings: React.FC = () => {
                       </div>
                       <span className="provider-model-subtitle">
                         {prov.model ? `Модель: ${prov.model}` : 'Модель не выбрана'}
+                        {prov.fastModel && prov.fastModel !== prov.model ? ` • Fast: ${prov.fastModel}` : ''}
                       </span>
                     </div>
                   </div>

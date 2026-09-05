@@ -425,9 +425,26 @@ export class ToolExecutor {
       } catch {}
     }
 
-    // 3. Defensive Recovery: Balance unclosed braces/brackets from token truncation
+    // 3. Defensive Recovery: Balance unclosed strings and braces/brackets from token truncation
     try {
       let balanced = cleaned
+      let inString = false
+      let isEscaped = false
+      for (let i = 0; i < balanced.length; i++) {
+        const char = balanced[i]
+        if (char === '\\' && !isEscaped) {
+          isEscaped = true
+          continue
+        }
+        if (char === '"' && !isEscaped) {
+          inString = !inString
+        }
+        isEscaped = false
+      }
+      if (inString) {
+        balanced += '"'
+      }
+
       const openBraces = (balanced.match(/\{/g) || []).length
       const closeBraces = (balanced.match(/\}/g) || []).length
       if (openBraces > closeBraces) {

@@ -1,6 +1,7 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { spawn, execSync, ChildProcess } from 'child_process'
 import * as fs from 'fs'
-import { join, normalize } from 'path'
+import { join, normalize, dirname, basename } from 'path'
 import { runAgent } from './agent/index'
 import { ChatService } from './agent/services/ChatService'
 import { MemoryService } from './agent/services/MemoryService'
@@ -10,8 +11,26 @@ import { SkillService } from './agent/services/SkillService'
 import { SchedulerService } from './agent/services/SchedulerService'
 import { McpService } from './agent/services/McpService'
 import { LocalStorageService } from './services/LocalStorageService'
+import { TerminalSessionManager } from './services/TerminalSessionManager'
 
 app.name = 'Zipply'
+
+function stripAnsi(text: string): string {
+  return text.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '')
+}
+
+
+// Enforce canonical cross-platform user data directory across all environments
+// (dev mode, packaged NSIS installer, Linux AppImage/deb/xbps, macOS)
+try {
+  const canonicalUserData = LocalStorageService.getCanonicalUserDataDir()
+  if (!fs.existsSync(canonicalUserData)) {
+    fs.mkdirSync(canonicalUserData, { recursive: true })
+  }
+  app.setPath('userData', canonicalUserData)
+} catch (err) {
+  console.warn('[main] Could not set canonical userData path:', err)
+}
 
 let mainWindow: BrowserWindow | null = null
 const activeControllers: Map<string, AbortController> = new Map()
@@ -66,7 +85,16 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    try {
+      const parsed = new URL(details.url)
+      if (['http:', 'https:', 'mailto:'].includes(parsed.protocol)) {
+        shell.openExternal(details.url)
+      } else {
+        console.warn('[main] Blocked unsafe URL protocol:', details.url)
+      }
+    } catch {
+      // Invalid URL string, safely ignore
+    }
     return { action: 'deny' }
   })
 
@@ -145,10 +173,15 @@ app.whenReady().then(() => {
         : defaultBase
     const folderName = (name || '').trim()
     if (!folderName) return null
-    const full = join(base, folderName)
+    // Guard against path traversal attacks (e.g. ../../)
+    const sanitizedName = folderName.replace(/[/\\]/g, '').replace(/^\.+/, '')
+    if (!sanitizedName || sanitizedName === '.' || sanitizedName === '..' || sanitizedName.includes('..')) return null
+    const resolvedBase = normalize(base)
+    const full = join(resolvedBase, sanitizedName)
+    if (!full.startsWith(resolvedBase)) return null
     try {
       await fs.promises.mkdir(full, { recursive: true })
-      return { name: folderName, path: full }
+      return { name: sanitizedName, path: full }
     } catch (err) {
       console.warn('[projects:create] Failed to create folder:', err)
       return null
@@ -517,6 +550,244 @@ app.whenReady().then(() => {
     }
   })
 
+  // Project Files & Directories IPC
+  ipcMain.handle('files:readDir', async (_event, dirPath: string) => {
+    try {
+      if (!dirPath || typeof dirPath !== 'string' || !fs.existsSync(dirPath)) {
+        return { success: false, error: 'Директория не найдена' }
+      }
+      const entries = fs.readdirSync(dirPath, { withFileTypes: true })
+      const items = entries.map((entry) => {
+        const fullPath = join(dirPath, entry.name)
+        const isDir = entry.isDirectory()
+        let size = 0
+        let mtime = 0
+        try {
+          const stat = fs.statSync(fullPath)
+          size = stat.size
+          mtime = stat.mtimeMs
+        } catch {}
+        return {
+          name: entry.name,
+          path: fullPath,
+          isDirectory: isDir,
+          isFile: entry.isFile(),
+          size,
+          mtime,
+          ext: isDir ? '' : entry.name.split('.').pop()?.toLowerCase() || ''
+        }
+      })
+
+      // Sort: folders first (alphabetical), then files (alphabetical)
+      items.sort((a, b) => {
+        if (a.isDirectory !== b.isDirectory) {
+          return a.isDirectory ? -1 : 1
+        }
+        return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+      })
+
+      return { success: true, items }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      return { success: false, error: msg }
+    }
+  })
+
+  ipcMain.handle('files:createFile', async (_event, filePath: string) => {
+    try {
+      if (!filePath || typeof filePath !== 'string') return { success: false, error: 'Укажите путь' }
+      const parentDir = dirname(filePath)
+      if (!fs.existsSync(parentDir)) {
+        fs.mkdirSync(parentDir, { recursive: true })
+      }
+      if (fs.existsSync(filePath)) {
+        return { success: false, error: 'Файл уже существует' }
+      }
+      fs.writeFileSync(filePath, '', 'utf8')
+      return { success: true }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      return { success: false, error: msg }
+    }
+  })
+
+  ipcMain.handle('files:createDir', async (_event, dirPath: string) => {
+    try {
+      if (!dirPath || typeof dirPath !== 'string') return { success: false, error: 'Укажите путь' }
+      if (fs.existsSync(dirPath)) {
+        return { success: false, error: 'Папка уже существует' }
+      }
+      fs.mkdirSync(dirPath, { recursive: true })
+      return { success: true }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      return { success: false, error: msg }
+    }
+  })
+
+  ipcMain.handle('files:rename', async (_event, { oldPath, newPath }: { oldPath: string; newPath: string }) => {
+    try {
+      if (!oldPath || !newPath || !fs.existsSync(oldPath)) {
+        return { success: false, error: 'Исходный путь не найден' }
+      }
+      if (fs.existsSync(newPath)) {
+        return { success: false, error: 'Элемент с таким именем уже существует' }
+      }
+      fs.renameSync(oldPath, newPath)
+      return { success: true }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      return { success: false, error: msg }
+    }
+  })
+
+  ipcMain.handle('files:move', async (_event, { sourcePath, targetDirPath }: { sourcePath: string; targetDirPath: string }) => {
+    try {
+      if (!sourcePath || !targetDirPath || !fs.existsSync(sourcePath) || !fs.existsSync(targetDirPath)) {
+        return { success: false, error: 'Неверный путь источника или назначения' }
+      }
+      const stat = fs.statSync(targetDirPath)
+      if (!stat.isDirectory()) {
+        return { success: false, error: 'Цель перемещения должна быть директорией' }
+      }
+      const fileName = basename(sourcePath)
+      const destPath = join(targetDirPath, fileName)
+      if (normalize(sourcePath).toLowerCase() === normalize(destPath).toLowerCase()) {
+        return { success: true }
+      }
+      if (normalize(targetDirPath).toLowerCase().startsWith(normalize(sourcePath).toLowerCase())) {
+        return { success: false, error: 'Нельзя переместить папку внутрь самой себя' }
+      }
+      if (fs.existsSync(destPath)) {
+        return { success: false, error: `Элемент "${fileName}" уже существует в этой папке` }
+      }
+      fs.renameSync(sourcePath, destPath)
+      return { success: true, destPath }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      return { success: false, error: msg }
+    }
+  })
+
+  ipcMain.handle('files:delete', async (_event, targetPath: string) => {
+    try {
+      if (!targetPath || !fs.existsSync(targetPath)) {
+        return { success: false, error: 'Файл или папка не найдены' }
+      }
+      try {
+        await shell.trashItem(targetPath)
+        return { success: true }
+      } catch {
+        fs.rmSync(targetPath, { recursive: true, force: true })
+        return { success: true }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      return { success: false, error: msg }
+    }
+  })
+
+  ipcMain.handle('files:reveal', async (_event, targetPath: string) => {
+    try {
+      if (targetPath && fs.existsSync(targetPath)) {
+        shell.showItemInFolder(targetPath)
+        return true
+      }
+      return false
+    } catch {
+      return false
+    }
+  })
+
+  // Interactive User Terminal IPC
+  ipcMain.on('terminal:run', (event, { runId, command, cwd, sessionId }: { runId: string; command: string; cwd?: string; sessionId?: string }) => {
+    if (!command || typeof command !== 'string') return
+    const isWin = process.platform === 'win32'
+    const resolvedCwd = cwd && fs.existsSync(cwd) ? cwd : LocalStorageService.getDefaultProjectsDir()
+    const targetSessionId = sessionId || 'term_1'
+
+    const sessionManager = TerminalSessionManager.getInstance()
+    sessionManager.killProcess(runId)
+
+    const shell = isWin ? (process.env.POWERSHELL_PATH || 'powershell.exe') : (process.env.SHELL || '/bin/sh')
+    const args = isWin
+      ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', `$OutputEncoding = [Console]::InputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${command}`]
+      : ['-c', command]
+
+    try {
+      const child = spawn(shell, args, {
+        cwd: resolvedCwd,
+        env: { ...process.env, PYTHONUNBUFFERED: '1', FORCE_COLOR: '0' },
+        windowsHide: true
+      })
+
+      sessionManager.recordCommandStart({
+        sessionId: targetSessionId,
+        runId,
+        command,
+        cwd: resolvedCwd,
+        initiator: 'user',
+        child,
+        pid: child.pid
+      })
+
+      child.stdout?.on('data', (chunk) => {
+        const text = stripAnsi(chunk.toString('utf8'))
+        sessionManager.appendOutput(runId, text)
+        safeSend(event.sender, 'terminal:data', { runId, text, stream: 'stdout' })
+      })
+
+      child.stderr?.on('data', (chunk) => {
+        const text = stripAnsi(chunk.toString('utf8'))
+        sessionManager.appendOutput(runId, text)
+        safeSend(event.sender, 'terminal:data', { runId, text, stream: 'stderr' })
+      })
+
+      child.on('error', (err) => {
+        const errText = `\n[Ошибка запуска]: ${err.message}\n`
+        sessionManager.appendOutput(runId, errText)
+        sessionManager.recordCommandExit(runId, 1)
+        safeSend(event.sender, 'terminal:data', { runId, text: errText, stream: 'stderr' })
+        safeSend(event.sender, 'terminal:exit', { runId, code: 1 })
+      })
+
+      child.on('close', (code) => {
+        sessionManager.recordCommandExit(runId, code ?? 0)
+        safeSend(event.sender, 'terminal:exit', { runId, code: code ?? 0 })
+      })
+    } catch (err: any) {
+      const errText = `\n[Ошибка]: ${err.message}\n`
+      sessionManager.appendOutput(runId, errText)
+      sessionManager.recordCommandExit(runId, 1)
+      safeSend(event.sender, 'terminal:data', { runId, text: errText, stream: 'stderr' })
+      safeSend(event.sender, 'terminal:exit', { runId, code: 1 })
+    }
+  })
+
+  ipcMain.handle('terminal:sendInput', (_event, { targetId, input }: { targetId: string; input: string }) => {
+    return TerminalSessionManager.getInstance().sendInput(targetId, input)
+  })
+
+  ipcMain.on('terminal:syncSessions', (_event, { sessions, activeSessionId }: { sessions: any[]; activeSessionId?: string }) => {
+    if (Array.isArray(sessions)) {
+      TerminalSessionManager.getInstance().syncFromRenderer(sessions, activeSessionId)
+    }
+  })
+
+  ipcMain.handle('terminal:kill', (_event, { runId }: { runId?: string } = {}) => {
+    const sessionManager = TerminalSessionManager.getInstance()
+    if (runId) {
+      return sessionManager.killProcess(runId)
+    } else {
+      sessionManager.killAll()
+      return true
+    }
+  })
+
+  ipcMain.handle('terminal:getDefaultCwd', () => {
+    return LocalStorageService.getDefaultProjectsDir()
+  })
+
   createWindow()
 
   app.on('activate', function () {
@@ -526,12 +797,14 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   try {
+    TerminalSessionManager.getInstance().killAll()
     McpService.stopAll()
   } catch {}
 })
 
 app.on('window-all-closed', () => {
   try {
+    TerminalSessionManager.getInstance().killAll()
     McpService.stopAll()
   } catch {}
   if (process.platform !== 'darwin') {

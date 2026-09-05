@@ -1,0 +1,60 @@
+.window-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+}
+
+.control-btn {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: transform 0.15s ease, filter 0.15s ease, opacity 0.15s ease;
+  position: relative;
+  -webkit-app-region: no-drag;
+}
+
+.control-btn svg {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  width: 7px;
+  height: 7px;
+  color: rgba(0, 0, 0, 0.7);
+}
+
+.window-controls:hover .control-btn svg {
+  opacity: 0.85;
+}
+
+.control-btn:hover {
+  filter: brightness(1.15);
+  transform: scale(1.12);
+}
+
+.control-btn:active {
+  transform: scale(0.92);
+  filter: brightness(0.85);
+}
+
+/* Green - Maximize / Restore */
+.control-btn.btn-green {
+  background-color: #27C93F;
+}
+
+/* Yellow - Minimize */
+.control-btn.btn-yellow {
+  background-color: #FFBD2E;
+}
+
+/* Red - Close */
+.control-btn.btn-red {
+  background-color: #FF5F56;
+}

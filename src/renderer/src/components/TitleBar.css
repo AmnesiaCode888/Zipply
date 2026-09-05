@@ -167,10 +167,50 @@
   -webkit-app-region: drag;
 }
 
+.titlebar-right-closed {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-terminal-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  background-color: var(--btn-bg, rgba(255, 255, 255, 0.06));
+  color: var(--text-secondary, #A1A1AA);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-terminal-btn:hover {
+  background-color: var(--btn-bg-hover, rgba(255, 255, 255, 0.14));
+  color: var(--text-primary, #FFFFFF);
+  border-color: var(--border-hover, rgba(255, 255, 255, 0.18));
+}
+
+.titlebar-terminal-btn.active {
+  background-color: rgba(255, 255, 255, 0.16);
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.titlebar-terminal-btn:active {
+  transform: scale(0.94);
+}
+
+
 .window-controls {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
   -webkit-app-region: no-drag;
 }
 

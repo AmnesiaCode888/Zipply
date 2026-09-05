@@ -80,11 +80,11 @@ export function isDeepThought(step: StepItem): boolean {
 
 export function formatStepTitle(step: StepItem): string {
   if (step.type === 'thought') {
-    if (!step.durationSeconds) return 'Thinking...'
+    if (!step.durationSeconds) return 'Размышляю...'
     if (step.durationSeconds >= DEEP_THINKING_THRESHOLD_S) {
-      return `Deep thinking · ${step.durationSeconds}s`
+      return `Глубокое размышление · ${step.durationSeconds}с`
     }
-    return `Thought for ${step.durationSeconds}s`
+    return `Размышлял ${step.durationSeconds}с`
   }
   if (step.type === 'web_search') {
     const q = step.target || (step.args?.query as string) || ''
@@ -147,7 +147,7 @@ export function formatStepTitle(step: StepItem): string {
   if (step.action && step.target) {
     return `${step.action} ${step.target}`
   }
-  return step.action || step.target || 'Processing...'
+  return step.action || step.target || 'Обработка...'
 }
 
 /**

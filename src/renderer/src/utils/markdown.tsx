@@ -178,16 +178,30 @@ export function parseInlineMarkdown(text: string): React.ReactNode[] {
 
     // $...$ inline LaTeX (not $$)
     if (text[i] === '$' && text[i + 1] !== '$') {
-      if (currentText) { parts.push(currentText); currentText = '' }
-      const closeIdx = text.indexOf('$', i + 1)
-      if (closeIdx !== -1) {
-        const latex = text.slice(i + 1, closeIdx)
-        // Make sure it's not empty
-        if (latex.trim()) {
-          const node = renderKatex(latex, false, `math-dollar-${i}`)
-          parts.push(node ?? `$${latex}$`)
-          i = closeIdx + 1
-          continue
+      const prevChar = i > 0 ? text[i - 1] : ' '
+      const nextChar = text[i + 1] || ' '
+      // Standard LaTeX rules: opening $ must not be preceded by alnum and not followed by whitespace or digit (currency amounts like $5)
+      const isValidOpening = !/[a-zA-Z0-9]/.test(prevChar) && nextChar !== ' ' && nextChar !== '\t' && nextChar !== '\n' && !/^\d/.test(nextChar)
+
+      if (isValidOpening) {
+        const closeIdx = text.indexOf('$', i + 1)
+        if (closeIdx !== -1) {
+          const charBeforeClose = text[closeIdx - 1]
+          const charAfterClose = text[closeIdx + 1] || ' '
+          const latex = text.slice(i + 1, closeIdx)
+          const isValidClosing = charBeforeClose !== ' ' && charBeforeClose !== '\t' && !/[0-9]/.test(charAfterClose) && !latex.includes('\n')
+          // Must look like mathematical expression (contains math symbols, backslash commands, relations, or single variables)
+          const looksLikeMath = /[\\_^=+\-*/<>∂∫∑∏√π]|\b[a-zA-Z]\b/.test(latex) && !/^\d+(?:[.,]\d+)?\s*(?:usd|eur|rub|руб|долл|cents?|dollars?)/i.test(latex)
+
+          if (isValidClosing && looksLikeMath && latex.trim()) {
+            if (currentText) { parts.push(currentText); currentText = '' }
+            const node = renderKatex(latex, false, `math-dollar-${i}`)
+            if (node) {
+              parts.push(node)
+              i = closeIdx + 1
+              continue
+            }
+          }
         }
       }
       currentText += '$'
@@ -268,18 +282,23 @@ export function parseInlineMarkdown(text: string): React.ReactNode[] {
         if (closingParenIndex !== -1) {
           if (currentText) { parts.push(currentText); currentText = '' }
           const linkText = text.slice(i + 1, closingBracketIndex)
-          const linkUrl = text.slice(closingBracketIndex + 2, closingParenIndex)
-          parts.push(
-            <a
-              key={`link-${i}`}
-              href={linkUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="msg-link"
-            >
-              {parseInlineMarkdown(linkText)}
-            </a>
-          )
+          const rawLinkUrl = text.slice(closingBracketIndex + 2, closingParenIndex).trim()
+          const isSafeUrl = /^(https?:\/\/|mailto:)/i.test(rawLinkUrl)
+          if (isSafeUrl) {
+            parts.push(
+              <a
+                key={`link-${i}`}
+                href={rawLinkUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="msg-link"
+              >
+                {parseInlineMarkdown(linkText)}
+              </a>
+            )
+          } else {
+            parts.push(parseInlineMarkdown(linkText))
+          }
           i = closingParenIndex + 1
           continue
         }
