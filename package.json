@@ -31,11 +31,11 @@
     "postinstall": "electron-builder install-app-deps",
     "icons": "powershell -ExecutionPolicy Bypass -File scripts/generate-icons.ps1",
     "build:win": "npm run build && electron-builder --win",
-    "build:linux": "npm run build && electron-builder --linux AppImage && node scripts/build-deb.js && node scripts/build-xbps.js",
-    "build:appimage": "npm run build && electron-builder --linux AppImage",
+    "build:linux": "npm run build && node scripts/build-appimage.js && node scripts/build-deb.js && node scripts/build-xbps.js",
+    "build:appimage": "npm run build && node scripts/build-appimage.js",
     "build:deb": "npm run build && node scripts/build-deb.js",
     "build:xbps": "npm run build && node scripts/build-xbps.js",
-    "build:all": "npm run build && electron-builder --win && electron-builder --linux AppImage && node scripts/build-deb.js && node scripts/build-xbps.js"
+    "build:all": "npm run build && electron-builder --win && node scripts/build-appimage.js && node scripts/build-deb.js && node scripts/build-xbps.js"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",
