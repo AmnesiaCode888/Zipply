@@ -44,18 +44,18 @@
 
 ---
 
-## <img src="resources/icons/blue/sparkles.svg" width="22" height="22" /> Multi-Agent Swarm
+##  <img src="resources/icons/blue/terminal.svg" width="18" height="18" /> Multi-Agent Swarm
 
 Zipply orchestrates specialized agents cooperating across a shared Blackboard architecture:
 
 | Agent | Role | Scope & Capabilities |
 | :--- | :--- | :--- |
-| <img src="resources/icons/blue/bot.svg" width="18" height="18" /> **ZipplyAgent** | Primary Engineer | Full filesystem read/write, CLI tool execution, multi-step self-correction |
-| <img src="resources/icons/blue/compass.svg" width="18" height="18" /> **ArchitectAgent** | System Architect | Read-only AST analysis, multi-file blueprints, dependency boundary mapping |
-| <img src="resources/icons/blue/hammer.svg" width="18" height="18" /> **WorkerAgent** | Surgical Implementer | Fast localized diff edits, incremental builds, and test verification |
-| <img src="resources/icons/blue/search.svg" width="18" height="18" /> **AskAgent** | Codebase Explorer | Semantic code navigation, codebase Q&A without modifying project state |
-| <img src="resources/icons/blue/terminal.svg" width="18" height="18" /> **TerminalAgent** | Shell Specialist | Streaming command execution, smart log truncation, and error triage |
-| <img src="resources/icons/blue/globe.svg" width="18" height="18" /> **WebSearchAgent** | Online Researcher | Real-time web search and documentation retrieval |
+| **ZipplyAgent** | Primary Engineer | Full filesystem read/write, CLI tool execution, multi-step self-correction |
+| **ArchitectAgent** | System Architect | Read-only AST analysis, multi-file blueprints, dependency boundary mapping |
+| **WorkerAgent** | Surgical Implementer | Fast localized diff edits, incremental builds, and test verification |
+| **AskAgent** | Codebase Explorer | Semantic code navigation, codebase Q&A without modifying project state |
+| **TerminalAgent** | Shell Specialist | Streaming command execution, smart log truncation, and error triage |
+| **WebSearchAgent** | Online Researcher | Real-time web search and documentation retrieval |
 
 ---
 
@@ -85,22 +85,22 @@ Direct connection to state-of-the-art model APIs without mandatory subscriptions
 
 ## <img src="resources/icons/blue/puzzle.svg" width="22" height="22" /> Core Capabilities
 
-### <img src="resources/icons/blue/puzzle.svg" width="18" height="18" /> Model Context Protocol (MCP)
+### Model Context Protocol (MCP)
 * Native stdio MCP client implementation.
 * On-disk tool schema caching for minimal LLM context window overhead.
 * 1-click import compatible with Cursor, Claude Desktop, and Antigravity configs.
 * In-app server status management, environment variable controls, and tool authorization.
 
-### <img src="resources/icons/blue/sparkles.svg" width="18" height="18" /> Dynamic Skills Framework
+### Dynamic Skills Framework
 * Markdown-based skills with frontmatter triggers and auto-enforcement directives.
 * Semantic vector embeddings for automatic context-based skill retrieval.
 * Integrated in-app Skill Editor with live preview and validation.
 
-### <img src="resources/icons/blue/brain.svg" width="18" height="18" /> Long-Term Memory & Blackboard
+### Long-Term Memory & Blackboard
 * Subject-based conflict invalidation: new architectural decisions automatically supersede outdated assumptions.
 * Blackboard working memory tracking active hypotheses and execution context across subagent lifecycles.
 
-### <img src="resources/icons/blue/shield-check.svg" width="18" height="18" /> Reliability & Error Recovery
+### Reliability & Error Recovery
 * 4-level fuzzy diff engine with Levenshtein fallback and indentation preservation.
 * Fatal syntax error classification with automatic edit rollback.
 * Smart head/tail log truncation preserving critical command outputs, exit codes, and stack traces.
