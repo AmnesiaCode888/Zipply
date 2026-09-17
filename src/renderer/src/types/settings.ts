@@ -1,4 +1,4 @@
-export type SettingsTab = 'models' | 'mcp' | 'appearance' | 'shortcuts' | 'storage'
+export type SettingsTab = 'models' | 'mcp' | 'appearance' | 'shortcuts' | 'storage' | 'access'
 
 export type AiProviderPreset =
   | 'deepseek'
@@ -15,6 +15,7 @@ export type AiProviderPreset =
   | 'lmstudio'
   | 'vllm'
   | 'custom'
+  | 'custom_provider'
 
 export interface ConnectedProvider {
   id: string
@@ -29,6 +30,10 @@ export interface ConnectedProvider {
   embeddingBaseUrl?: string     // Custom embedding endpoint if different from baseUrl
   requiresKey?: boolean
   isCustom?: boolean
+  // Inference options (Ollama, LM Studio, etc.)
+  contextLength?: number
+  temperature?: number
+  maxTokens?: number
 }
 
 export interface DiscoveredLocalService {
@@ -53,6 +58,7 @@ export interface AiConfig {
   tavilyKey?: string
   temperature: number
   maxTokens: number
+  contextLength?: number
   stream: boolean
   baseDir?: string
   // Memory & Personalization
@@ -126,3 +132,22 @@ export interface LimitsInfo {
   contextLimitK: number
   resetInMinutes: number
 }
+
+export interface TelegramConfig {
+  token: string
+  enabled: boolean
+  allowedUsers: string[]
+  autoStart: boolean
+  defaultWorkspace?: string
+  syncWithActiveChat?: boolean
+  notifyOnDesktopDone?: boolean
+}
+
+export interface TelegramBotStatus {
+  status: 'stopped' | 'starting' | 'running' | 'error'
+  botInfo?: { id: number; username: string; firstName: string }
+  error?: string
+  lastActiveAt?: string
+  currentModel?: string
+}
+

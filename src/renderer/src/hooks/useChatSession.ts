@@ -24,11 +24,12 @@ export interface UseChatSessionReturn {
   activeChatId: string | null
   activeChat: ChatSession | null
   isStreaming: boolean
+  streamingChatIds: Set<string>
   selectChat: (chatId: string) => void
   newChat: () => void
   deleteChat: (chatId: string) => void
   sendMessage: (text: string, project?: ProjectRef | null, images?: AttachedImage[]) => void
-  cancelGeneration: () => void
+  cancelGeneration: (chatId?: string) => void
 }
 
 const DUMMY_CHAT_IDS = new Set([
@@ -130,6 +131,8 @@ function mapToolToStepType(toolName: string, action?: string): StepType {
       return 'save_skill'
     case 'call_mcp_tool':
       return 'mcp'
+    case 'browser':
+      return 'browser'
     default:
       if (toolName.startsWith('mcp_')) return 'mcp'
       return 'read'
@@ -138,6 +141,18 @@ function mapToolToStepType(toolName: string, action?: string): StepType {
 
 function getStepActionLabel(toolName: string, action?: string): string {
   switch (toolName) {
+    case 'browser':
+      if (action === 'navigate') return 'Переход'
+      if (action === 'screenshot') return 'Скриншот'
+      if (action === 'click') return 'Клик'
+      if (action === 'type') return 'Ввод'
+      if (action === 'scroll') return 'Прокрутка'
+      if (action === 'get_content') return 'Чтение'
+      if (action === 'new_tab') return 'Новая вкладка'
+      if (action === 'close_tab') return 'Закрытие вкладки'
+      if (action === 'switch_tab') return 'Переключение'
+      if (action === 'list_tabs') return 'Вкладки'
+      return 'Браузер'
     case 'file':
       if (action === 'edit') return 'Edit'
       if (action === 'write' || action === 'append') return 'Create'
@@ -213,6 +228,14 @@ export function normalizeInnerStep(s: any): StepItem {
 }
 
 function getStepTarget(toolName: string, args: Record<string, any> = {}): string {
+  if (toolName === 'browser') {
+    if (args.url) return String(args.url)
+    if (args.action === 'click') return args.selector || args.text || ''
+    if (args.action === 'type') return args.selector ? `"${args.text || ''}" → ${args.selector}` : (args.text || '')
+    if (args.action === 'scroll') return args.direction ? `направление: ${args.direction}` : ''
+    if (args.description) return String(args.description)
+    return args.action || ''
+  }
   if (args.description) return String(args.description)
   if (toolName === 'file') return args.path || args.dest_path || ''
   if (toolName === 'grep_search') return args.query ? `"${args.query}"` : ''
@@ -238,17 +261,18 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 function normalizeAgentEvent(raw: unknown): AgentEvent | null {
   const event = asRecord(raw)
   if (!event || typeof event.type !== 'string') return null
+  const requestId = typeof event.requestId === 'string' ? event.requestId : undefined
 
   switch (event.type) {
     case 'token':
     case 'reasoning':
       return typeof event.content === 'string'
-        ? { type: event.type, content: event.content }
+        ? { type: event.type, content: event.content, requestId }
         : null
     case 'tool_start': {
       const args = asRecord(event.args) || {}
       return typeof event.callId === 'string' && typeof event.toolName === 'string'
-        ? { type: 'tool_start', callId: event.callId, toolName: event.toolName, args }
+        ? { type: 'tool_start', callId: event.callId, toolName: event.toolName, args, requestId }
         : null
     }
     case 'tool_progress':
@@ -260,7 +284,8 @@ function normalizeAgentEvent(raw: unknown): AgentEvent | null {
             elapsedSeconds: typeof event.elapsedSeconds === 'number' ? event.elapsedSeconds : undefined,
             statusText: typeof event.statusText === 'string' ? event.statusText : undefined,
             innerSteps: Array.isArray(event.innerSteps) ? event.innerSteps : undefined,
-            data: event.data
+            data: event.data,
+            requestId
           }
         : null
     case 'tool_result':
@@ -270,7 +295,8 @@ function normalizeAgentEvent(raw: unknown): AgentEvent | null {
             callId: event.callId,
             result: typeof event.result === 'string' ? event.result : '',
             error: Boolean(event.error),
-            data: event.data
+            data: event.data,
+            requestId
           }
         : null
     case 'done': {
@@ -285,12 +311,13 @@ function normalizeAgentEvent(raw: unknown): AgentEvent | null {
             totalTokens: usage.totalTokens
           }
         : undefined
-      return { type: 'done', usage: normalizedUsage }
+      return { type: 'done', usage: normalizedUsage, requestId }
     }
     case 'error':
       return {
         type: 'error',
-        message: typeof event.message === 'string' ? event.message : 'Не удалось выполнить запрос'
+        message: typeof event.message === 'string' ? event.message : 'Не удалось выполнить запрос',
+        requestId
       }
     case 'watchdog':
       return typeof event.status === 'string' && typeof event.message === 'string'
@@ -298,7 +325,8 @@ function normalizeAgentEvent(raw: unknown): AgentEvent | null {
             type: 'watchdog',
             status: event.status as 'warn' | 'intervene',
             message: event.message,
-            toolCount: typeof event.toolCount === 'number' ? event.toolCount : 0
+            toolCount: typeof event.toolCount === 'number' ? event.toolCount : 0,
+            requestId
           }
         : null
     default:
@@ -309,20 +337,24 @@ function normalizeAgentEvent(raw: unknown): AgentEvent | null {
 export function useChatSession(config?: AiConfig): UseChatSessionReturn {
   const [chats, setChats] = useState<ChatSession[]>(getStoredSessions)
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
-  const [isStreaming, setIsStreaming] = useState<boolean>(false)
+  const [streamingChatIds, setStreamingChatIds] = useState<Set<string>>(new Set())
 
-  const currentRequestIdRef = useRef<string | null>(null)
+  // Bidirectional mapping between requestId and chatId
+  const activeRequestsRef = useRef<Map<string, string>>(new Map()) // requestId -> chatId
+  const chatRequestsRef = useRef<Map<string, string>>(new Map())   // chatId -> requestId
+
   const activeChatIdRef = useRef<string | null>(null)
-  const roundStartTimeRef = useRef<number>(Date.now())
+  const roundStartTimesRef = useRef<Map<string, number>>(new Map()) // chatId -> timestamp
   const chatsRef = useRef<ChatSession[]>(chats)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isHydratedRef = useRef<boolean>(false)
   const wasStreamingRef = useRef<boolean>(false)
-  const pendingTokensRef = useRef<string>('')
-  const tokenFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingReasoningRef = useRef<string>('')
-  const reasoningFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const streamingChatIdRef = useRef<string | null>(null)
+
+  // Per-chat buffers and flush timers
+  const pendingTokensRef = useRef<Map<string, string>>(new Map())
+  const tokenFlushTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const pendingReasoningRef = useRef<Map<string, string>>(new Map())
+  const reasoningFlushTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   // Keep a always-current reference to config so callbacks don't go stale
   const configRef = useRef<AiConfig | undefined>(config)
@@ -404,6 +436,9 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
   // Keep refs synced
   useEffect(() => {
     activeChatIdRef.current = activeChatId
+    if (window.api?.telegram?.notifyActiveChat) {
+      window.api.telegram.notifyActiveChat(activeChatId)
+    }
   }, [activeChatId])
 
   // Persist sessions DEBOUNCED. Only after hydration is complete to prevent overwriting disk storage with empty state.
@@ -420,9 +455,12 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
     }, 800)
   }, [chats])
 
-  // Flush pending changes immediately when streaming transitions from running to stopped
+  const isStreaming = Boolean(activeChatId && streamingChatIds.has(activeChatId))
+  const anyStreaming = streamingChatIds.size > 0
+
+  // Flush pending changes immediately when all streaming transitions from running to stopped
   useEffect(() => {
-    if (wasStreamingRef.current && !isStreaming) {
+    if (wasStreamingRef.current && !anyStreaming) {
       if (isHydratedRef.current) {
         if (saveTimeoutRef.current) {
           clearTimeout(saveTimeoutRef.current)
@@ -431,8 +469,8 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
         saveSessionsToStorage(chatsRef.current, 0)
       }
     }
-    wasStreamingRef.current = isStreaming
-  }, [isStreaming])
+    wasStreamingRef.current = anyStreaming
+  }, [anyStreaming])
 
   // Never lose the tail of a conversation if the window closes before the debounce fires
   useEffect(() => {
@@ -464,25 +502,40 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
   }, [])
 
   const deleteChat = useCallback((chatId: string) => {
-    if (activeChatIdRef.current === chatId || streamingChatIdRef.current === chatId) {
-      if (tokenFlushTimerRef.current) {
-        clearTimeout(tokenFlushTimerRef.current)
-        tokenFlushTimerRef.current = null
+    const reqId = chatRequestsRef.current.get(chatId)
+    if (reqId) {
+      if (window.api?.agent) {
+        window.api.agent.cancel(reqId)
       }
-      if (reasoningFlushTimerRef.current) {
-        clearTimeout(reasoningFlushTimerRef.current)
-        reasoningFlushTimerRef.current = null
-      }
-      pendingTokensRef.current = ''
-      pendingReasoningRef.current = ''
-      streamingChatIdRef.current = null
-      if (currentRequestIdRef.current && window.api?.agent) {
-        window.api.agent.cancel(currentRequestIdRef.current)
-        currentRequestIdRef.current = null
-      }
-      setIsStreaming(false)
+      activeRequestsRef.current.delete(reqId)
+      chatRequestsRef.current.delete(chatId)
+    }
+
+    const tTimer = tokenFlushTimersRef.current.get(chatId)
+    if (tTimer) {
+      clearTimeout(tTimer)
+      tokenFlushTimersRef.current.delete(chatId)
+    }
+    const rTimer = reasoningFlushTimersRef.current.get(chatId)
+    if (rTimer) {
+      clearTimeout(rTimer)
+      reasoningFlushTimersRef.current.delete(chatId)
+    }
+    pendingTokensRef.current.delete(chatId)
+    pendingReasoningRef.current.delete(chatId)
+    roundStartTimesRef.current.delete(chatId)
+
+    setStreamingChatIds((prev) => {
+      if (!prev.has(chatId)) return prev
+      const next = new Set(prev)
+      next.delete(chatId)
+      return next
+    })
+
+    if (activeChatIdRef.current === chatId) {
       setActiveChatId(null)
     }
+
     setChats((prev) => {
       const updated = prev.filter((c) => c.id !== chatId)
       if (isHydratedRef.current) {
@@ -492,22 +545,97 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
     })
   }, [])
 
-  const cancelGeneration = useCallback(() => {
-    if (tokenFlushTimerRef.current) {
-      clearTimeout(tokenFlushTimerRef.current)
-      tokenFlushTimerRef.current = null
+  const cancelGeneration = useCallback((chatId?: string) => {
+    const targetChatId = chatId || activeChatIdRef.current
+    if (!targetChatId) return
+
+    const reqId = chatRequestsRef.current.get(targetChatId)
+    if (reqId) {
+      if (window.api?.agent) {
+        window.api.agent.cancel(reqId)
+      }
+      activeRequestsRef.current.delete(reqId)
+      chatRequestsRef.current.delete(targetChatId)
     }
-    if (reasoningFlushTimerRef.current) {
-      clearTimeout(reasoningFlushTimerRef.current)
-      reasoningFlushTimerRef.current = null
+
+    const tTimer = tokenFlushTimersRef.current.get(targetChatId)
+    if (tTimer) {
+      clearTimeout(tTimer)
+      tokenFlushTimersRef.current.delete(targetChatId)
     }
-    pendingTokensRef.current = ''
-    pendingReasoningRef.current = ''
-    streamingChatIdRef.current = null
-    if (currentRequestIdRef.current && window.api?.agent) {
-      window.api.agent.cancel(currentRequestIdRef.current)
-      currentRequestIdRef.current = null
-      setIsStreaming(false)
+    const rTimer = reasoningFlushTimersRef.current.get(targetChatId)
+    if (rTimer) {
+      clearTimeout(rTimer)
+      reasoningFlushTimersRef.current.delete(targetChatId)
+    }
+    pendingTokensRef.current.delete(targetChatId)
+    pendingReasoningRef.current.delete(targetChatId)
+    roundStartTimesRef.current.delete(targetChatId)
+
+    setStreamingChatIds((prev) => {
+      if (!prev.has(targetChatId)) return prev
+      const next = new Set(prev)
+      next.delete(targetChatId)
+      return next
+    })
+
+    // Finalize thinking state of last assistant message in targetChatId so UI stops spinning
+    setChats((prev) =>
+      prev.map((c) => {
+        if (c.id !== targetChatId) return c
+        const msgs = [...c.messages]
+        if (msgs.length === 0) return c
+        const lastIdx = msgs.length - 1
+        const assistantMsg = { ...msgs[lastIdx] }
+        if (assistantMsg.role !== 'assistant') return c
+
+        assistantMsg.isThinking = false
+        if (assistantMsg.segments) {
+          assistantMsg.segments = assistantMsg.segments.map((seg) => {
+            if (seg.type === 'tool_round' || seg.type === 'subagent_round') {
+              return { ...seg, isThinking: false }
+            }
+            if (seg.type === 'watchdog') return { ...seg, resolved: true }
+            return seg
+          })
+        }
+        msgs[lastIdx] = assistantMsg
+        return { ...c, messages: msgs }
+      })
+    )
+  }, [])
+
+  // Listen to background scheduler events (new chats, completed chats, notifications)
+  useEffect(() => {
+    if (!window.api?.schedule) return
+
+    const unsubCreated = window.api.schedule.onChatCreated?.((data) => {
+      if (data?.chat && data.chat.id) {
+        setChats((prev) => {
+          if (prev.some((c) => c.id === data.chat.id)) return prev
+          return [data.chat, ...prev]
+        })
+      }
+    })
+
+    const unsubUpdated = window.api.schedule.onChatUpdated?.((data) => {
+      if (data?.chat && data.chat.id) {
+        setChats((prev) =>
+          prev.map((c) => (c.id === data.chat.id ? { ...c, ...data.chat } : c))
+        )
+      }
+    })
+
+    const unsubSelect = window.api.schedule.onSelectChat?.((chatId) => {
+      if (chatId) {
+        setActiveChatId(chatId)
+      }
+    })
+
+    return () => {
+      if (unsubCreated) unsubCreated()
+      if (unsubUpdated) unsubUpdated()
+      if (unsubSelect) unsubSelect()
     }
   }, [])
 
@@ -552,17 +680,15 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
         .catch(() => {})
     }
 
-    const flushPendingTokens = (): void => {
-      if (tokenFlushTimerRef.current) {
-        clearTimeout(tokenFlushTimerRef.current)
-        tokenFlushTimerRef.current = null
+    const flushPendingTokens = (targetChatId: string): void => {
+      const timer = tokenFlushTimersRef.current.get(targetChatId)
+      if (timer) {
+        clearTimeout(timer)
+        tokenFlushTimersRef.current.delete(targetChatId)
       }
-      const pending = pendingTokensRef.current
+      const pending = pendingTokensRef.current.get(targetChatId)
       if (!pending) return
-      pendingTokensRef.current = ''
-
-      const targetChatId = streamingChatIdRef.current || activeChatIdRef.current
-      if (!targetChatId) return
+      pendingTokensRef.current.delete(targetChatId)
 
       setChats((prev) =>
         prev.map((c) => {
@@ -579,7 +705,8 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
           // If previous segment was an active tool round or subagent round, finalize its thinking state
           const lastSeg = segments[segments.length - 1]
           if (lastSeg && lastSeg.type === 'tool_round' && lastSeg.isThinking) {
-            const elapsed = Math.max(1, Math.round((Date.now() - roundStartTimeRef.current) / 1000))
+            const startTime = roundStartTimesRef.current.get(targetChatId) || Date.now()
+            const elapsed = Math.max(1, Math.round((Date.now() - startTime) / 1000))
             const initialSummary = lastSeg.summary || getHeuristicRoundSummary(lastSeg.steps)
             const roundId = lastSeg.id
             const roundSteps = lastSeg.steps
@@ -594,7 +721,8 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
 
             requestAiRoundSummary(targetChatId, roundId, roundSteps)
           } else if (lastSeg && lastSeg.type === 'subagent_round' && lastSeg.isThinking) {
-            const elapsed = lastSeg.totalWorkedSeconds || Math.max(1, Math.round((Date.now() - roundStartTimeRef.current) / 1000))
+            const startTime = roundStartTimesRef.current.get(targetChatId) || Date.now()
+            const elapsed = lastSeg.totalWorkedSeconds || Math.max(1, Math.round((Date.now() - startTime) / 1000))
             segments[segments.length - 1] = {
               ...lastSeg,
               isThinking: false,
@@ -624,17 +752,15 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
       )
     }
 
-    const flushPendingReasoning = (): void => {
-      if (reasoningFlushTimerRef.current) {
-        clearTimeout(reasoningFlushTimerRef.current)
-        reasoningFlushTimerRef.current = null
+    const flushPendingReasoning = (targetChatId: string): void => {
+      const timer = reasoningFlushTimersRef.current.get(targetChatId)
+      if (timer) {
+        clearTimeout(timer)
+        reasoningFlushTimersRef.current.delete(targetChatId)
       }
-      const pending = pendingReasoningRef.current
+      const pending = pendingReasoningRef.current.get(targetChatId)
       if (!pending) return
-      pendingReasoningRef.current = ''
-
-      const targetChatId = streamingChatIdRef.current || activeChatIdRef.current
-      if (!targetChatId) return
+      pendingReasoningRef.current.delete(targetChatId)
 
       setChats((prev) =>
         prev.map((c) => {
@@ -650,7 +776,7 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
           const lastSeg = segments[segments.length - 1]
 
           if (!lastSeg || lastSeg.type !== 'tool_round' || !lastSeg.isThinking) {
-            roundStartTimeRef.current = Date.now()
+            roundStartTimesRef.current.set(targetChatId, Date.now())
             const newRound: MessageSegment = {
               id: `seg-tr-${Date.now()}`,
               type: 'tool_round',
@@ -700,46 +826,75 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
       const evt = normalizeAgentEvent(rawEvent)
       if (!evt) return
 
-      const targetChatId = streamingChatIdRef.current || activeChatIdRef.current
-      if (!targetChatId) return
+      // Determine target chat ID: explicit chatId (from Telegram or Scheduler) or mapped from requestId
+      const reqId = evt.requestId || (rawEvent as any)?.requestId
+      const targetChatId = (rawEvent as any)?.chatId || (reqId ? activeRequestsRef.current.get(reqId) : undefined)
+      if (!targetChatId) {
+        return
+      }
 
-      // 1. TOKEN: Streaming assistant text response (batched throttling)
+      // Ensure assistant message container exists for this chat turn if not already created
+      setChats((prev) =>
+        prev.map((c) => {
+          if (c.id !== targetChatId) return c
+          const msgs = [...c.messages]
+          if (msgs.length === 0) return c
+          const lastMsg = msgs[msgs.length - 1]
+          if (lastMsg.role !== 'assistant') {
+            msgs.push({
+              id: `msg-${Date.now()}-a`,
+              role: 'assistant',
+              text: '',
+              segments: [],
+              isThinking: true
+            })
+            return { ...c, messages: msgs }
+          }
+          return c
+        })
+      )
+
+      // 1. TOKEN: Streaming assistant text response (batched throttling per chat)
       if (evt.type === 'token') {
         const token = evt.content || ''
         if (!token) return
 
-        if (pendingReasoningRef.current) {
-          flushPendingReasoning()
+        if (pendingReasoningRef.current.get(targetChatId)) {
+          flushPendingReasoning(targetChatId)
         }
 
-        pendingTokensRef.current += token
+        const prevPending = pendingTokensRef.current.get(targetChatId) || ''
+        pendingTokensRef.current.set(targetChatId, prevPending + token)
 
-        if (!tokenFlushTimerRef.current) {
-          tokenFlushTimerRef.current = setTimeout(flushPendingTokens, 40)
+        if (!tokenFlushTimersRef.current.has(targetChatId)) {
+          const t = setTimeout(() => flushPendingTokens(targetChatId), 40)
+          tokenFlushTimersRef.current.set(targetChatId, t)
         }
         return
       }
 
-      // 2. REASONING: Streaming thoughts / chain of thought (batched throttling)
+      // 2. REASONING: Streaming thoughts / chain of thought (batched throttling per chat)
       if (evt.type === 'reasoning') {
         const rChunk = evt.content || ''
         if (!rChunk) return
 
-        if (pendingTokensRef.current) {
-          flushPendingTokens()
+        if (pendingTokensRef.current.get(targetChatId)) {
+          flushPendingTokens(targetChatId)
         }
 
-        pendingReasoningRef.current += rChunk
+        const prevPending = pendingReasoningRef.current.get(targetChatId) || ''
+        pendingReasoningRef.current.set(targetChatId, prevPending + rChunk)
 
-        if (!reasoningFlushTimerRef.current) {
-          reasoningFlushTimerRef.current = setTimeout(flushPendingReasoning, 40)
+        if (!reasoningFlushTimersRef.current.has(targetChatId)) {
+          const t = setTimeout(() => flushPendingReasoning(targetChatId), 40)
+          reasoningFlushTimersRef.current.set(targetChatId, t)
         }
         return
       }
 
       // Flush any pending streamed tokens or reasoning before handling structural events
-      if (pendingTokensRef.current) flushPendingTokens()
-      if (pendingReasoningRef.current) flushPendingReasoning()
+      if (pendingTokensRef.current.get(targetChatId)) flushPendingTokens(targetChatId)
+      if (pendingReasoningRef.current.get(targetChatId)) flushPendingReasoning(targetChatId)
 
       setChats((prev) =>
         prev.map((c) => {
@@ -767,7 +922,8 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
                 if (!hasRealSteps) {
                   segments.pop()
                 } else {
-                  const elapsed = Math.max(1, Math.round((Date.now() - roundStartTimeRef.current) / 1000))
+                  const startTime = roundStartTimesRef.current.get(targetChatId) || Date.now()
+                  const elapsed = Math.max(1, Math.round((Date.now() - startTime) / 1000))
                   segments[segments.length - 1] = {
                     ...lastSeg,
                     isThinking: false,
@@ -784,7 +940,7 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
                 }
               }
 
-              roundStartTimeRef.current = Date.now()
+              roundStartTimesRef.current.set(targetChatId, Date.now())
               const targetAgentId = (args.agent_id as string) || 'ask'
               const agentDisplayName =
                 targetAgentId === 'terminal'
@@ -866,7 +1022,7 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
 
             const currentLastSeg = segments[segments.length - 1]
             if (!currentLastSeg || currentLastSeg.type !== 'tool_round' || !currentLastSeg.isThinking) {
-              roundStartTimeRef.current = Date.now()
+              roundStartTimesRef.current.set(targetChatId, Date.now())
               segments.push({
                 id: `seg-tr-${Date.now()}`,
                 type: 'tool_round',
@@ -986,7 +1142,8 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
                 finalAnswer = resData.answer
               }
 
-              const elapsed = subSeg.totalWorkedSeconds || Math.max(1, Math.round((Date.now() - roundStartTimeRef.current) / 1000))
+              const startTime = roundStartTimesRef.current.get(targetChatId) || Date.now()
+              const elapsed = subSeg.totalWorkedSeconds || Math.max(1, Math.round((Date.now() - startTime) / 1000))
               const roundSummary = subSeg.summary || getHeuristicRoundSummary(normSteps) || (subSeg.prompt ? subSeg.prompt.slice(0, 50) : '')
 
               subSeg.isThinking = false
@@ -1068,7 +1225,8 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
 
           // 6. DONE: Full turn completed
           if (evt.type === 'done') {
-            const elapsed = Math.max(1, Math.round((Date.now() - roundStartTimeRef.current) / 1000))
+            const startTime = roundStartTimesRef.current.get(targetChatId) || Date.now()
+            const elapsed = Math.max(1, Math.round((Date.now() - startTime) / 1000))
             const updatedSegments = segments
               .map((seg) => {
                 if (seg.type === 'tool_round') {
@@ -1128,9 +1286,22 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
             assistantMsg.isThinking = false
             assistantMsg.segments = updatedSegments
             msgs[lastMsgIndex] = assistantMsg
-            setIsStreaming(false)
-            currentRequestIdRef.current = null
-            streamingChatIdRef.current = null
+
+            // Clean up request mappings and buffers for targetChatId
+            if (reqId) {
+              activeRequestsRef.current.delete(reqId)
+            }
+            chatRequestsRef.current.delete(targetChatId)
+            pendingTokensRef.current.delete(targetChatId)
+            pendingReasoningRef.current.delete(targetChatId)
+            roundStartTimesRef.current.delete(targetChatId)
+
+            setStreamingChatIds((prev) => {
+              if (!prev.has(targetChatId)) return prev
+              const next = new Set(prev)
+              next.delete(targetChatId)
+              return next
+            })
 
             // Auto-generate title if this was the first prompt in a new session
             if (c.messages.length <= 2 && (c.title.startsWith('Новый диалог') || c.title.length > 30)) {
@@ -1177,9 +1348,22 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
             assistantMsg.isThinking = false
             assistantMsg.segments = updatedSegments
             msgs[lastMsgIndex] = assistantMsg
-            setIsStreaming(false)
-            currentRequestIdRef.current = null
-            streamingChatIdRef.current = null
+
+            // Clean up request mappings and buffers for targetChatId
+            if (reqId) {
+              activeRequestsRef.current.delete(reqId)
+            }
+            chatRequestsRef.current.delete(targetChatId)
+            pendingTokensRef.current.delete(targetChatId)
+            pendingReasoningRef.current.delete(targetChatId)
+            roundStartTimesRef.current.delete(targetChatId)
+
+            setStreamingChatIds((prev) => {
+              if (!prev.has(targetChatId)) return prev
+              const next = new Set(prev)
+              next.delete(targetChatId)
+              return next
+            })
             return { ...c, messages: msgs }
           }
 
@@ -1216,16 +1400,10 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
     })
 
     return () => {
-      if (tokenFlushTimerRef.current) {
-        clearTimeout(tokenFlushTimerRef.current)
-        tokenFlushTimerRef.current = null
-      }
-      if (reasoningFlushTimerRef.current) {
-        clearTimeout(reasoningFlushTimerRef.current)
-        reasoningFlushTimerRef.current = null
-      }
-      if (pendingTokensRef.current) flushPendingTokens()
-      if (pendingReasoningRef.current) flushPendingReasoning()
+      tokenFlushTimersRef.current.forEach((timer) => clearTimeout(timer))
+      tokenFlushTimersRef.current.clear()
+      reasoningFlushTimersRef.current.forEach((timer) => clearTimeout(timer))
+      reasoningFlushTimersRef.current.clear()
       if (typeof unsubscribe === 'function') {
         unsubscribe()
       }
@@ -1244,17 +1422,14 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
       stream: true,
       temperature: 0.7,
       maxTokens: 4096,
+      contextLength: 32768,
       baseDir: ''
     }
     if (configRef.current && typeof configRef.current === 'object') {
       aiConfig = { ...aiConfig, ...configRef.current }
     }
 
-
     const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
-    currentRequestIdRef.current = requestId
-    roundStartTimeRef.current = Date.now()
-    setIsStreaming(true)
 
     const userMsg: ChatMessage = {
       id: `msg-${Date.now()}-u`,
@@ -1326,16 +1501,16 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
                 } else if (seg.type === 'tool_round') {
                   const summary = seg.summary || getHeuristicRoundSummary(seg.steps)
                   if (summary) {
-                    toolActions.push(`[Действия: ${summary}]`)
+                    toolActions.push(`<past_tool_round>${summary}</past_tool_round>`)
                   }
                 } else if (seg.type === 'subagent_round') {
                   const aName = seg.agentName || seg.agentId || 'Субагент'
-                  const summary = seg.summary || (seg.prompt ? `Субагент (${aName}): ${seg.prompt}` : `Субагент (${aName})`)
+                  const summary = seg.summary || (seg.prompt ? `${aName}: ${seg.prompt}` : aName)
                   if (summary) {
-                    toolActions.push(`[${summary}]`)
+                    toolActions.push(`<past_subagent_round agent="${aName}">${summary}</past_subagent_round>`)
                   }
                   if (seg.answer?.trim()) {
-                    toolActions.push(`[Ответ субагента: ${seg.answer.trim()}]`)
+                    toolActions.push(`<past_subagent_answer>${seg.answer.trim()}</past_subagent_answer>`)
                   }
                 }
               }
@@ -1368,9 +1543,11 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
       )
     }
 
-    streamingChatIdRef.current = targetChatId
-    pendingTokensRef.current = ''
-    pendingReasoningRef.current = ''
+    // Register active request for this chat session
+    activeRequestsRef.current.set(requestId, targetChatId)
+    chatRequestsRef.current.set(targetChatId, requestId)
+    roundStartTimesRef.current.set(targetChatId, Date.now())
+    setStreamingChatIds((prev) => new Set(prev).add(targetChatId))
 
     // Bind the working directory: explicit project > the chat's stored project
     const effectiveWorkspace =
@@ -1380,13 +1557,22 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
     if (effectiveWorkspace) {
       aiConfig.workspacePath = effectiveWorkspace
     }
+    if (targetChatId) {
+      aiConfig.chatId = targetChatId
+    }
 
     // Call real zipply agent in Electron main process
     if (window.api?.agent?.chat) {
       window.api.agent.chat(conversationHistory, aiConfig, requestId, 'zipply')
     } else {
       console.warn('window.api.agent is not available in current environment')
-      setIsStreaming(false)
+      activeRequestsRef.current.delete(requestId)
+      chatRequestsRef.current.delete(targetChatId)
+      setStreamingChatIds((prev) => {
+        const next = new Set(prev)
+        next.delete(targetChatId)
+        return next
+      })
     }
   }, [])
 
@@ -1395,6 +1581,7 @@ export function useChatSession(config?: AiConfig): UseChatSessionReturn {
     activeChatId,
     activeChat,
     isStreaming,
+    streamingChatIds,
     selectChat,
     newChat,
     deleteChat,

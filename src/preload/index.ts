@@ -84,6 +84,10 @@ const api = {
       ipcRenderer.invoke('skills:toggleEnabled', { name, enabled }),
     togglePackage: (skillNames: string[], enabled: boolean) =>
       ipcRenderer.invoke('skills:togglePackage', { skillNames, enabled }),
+    toggleCategory: (category: string, enabled: boolean, workspacePath?: string) =>
+      ipcRenderer.invoke('skills:toggleCategory', { category, enabled, workspacePath }),
+    transfer: (items: Array<{ name: string; sourcePath: string; isFolder?: boolean }>, targetCategory?: string, isCore?: boolean) =>
+      ipcRenderer.invoke('skills:transfer', { items, targetCategory, isCore }),
     deleteMultiple: (items: Array<{ name: string; isCore?: boolean; sourcePath?: string }>) =>
       ipcRenderer.invoke('skills:deleteMultiple', { items }),
     openFolder: () => ipcRenderer.invoke('skills:openFolder'),
@@ -97,7 +101,42 @@ const api = {
     cancel: (id: string) => ipcRenderer.invoke('schedule:cancel', id),
     pause: (id: string) => ipcRenderer.invoke('schedule:pause', id),
     resume: (id: string) => ipcRenderer.invoke('schedule:resume', id),
-    trigger: (id: string) => ipcRenderer.invoke('schedule:trigger', id)
+    trigger: (id: string) => ipcRenderer.invoke('schedule:trigger', id),
+    onChatCreated: (callback: (data: { chat: any }) => void) => {
+      const listener = (_: any, data: any) => callback(data)
+      ipcRenderer.on('scheduler:chatCreated', listener)
+      return () => {
+        ipcRenderer.removeListener('scheduler:chatCreated', listener)
+      }
+    },
+    onChatUpdated: (callback: (data: { chatId: string; chat: any }) => void) => {
+      const listener = (_: any, data: any) => callback(data)
+      ipcRenderer.on('scheduler:chatUpdated', listener)
+      return () => {
+        ipcRenderer.removeListener('scheduler:chatUpdated', listener)
+      }
+    },
+    onSelectChat: (callback: (chatId: string) => void) => {
+      const listener = (_: any, chatId: string) => callback(chatId)
+      ipcRenderer.on('scheduler:selectChat', listener)
+      return () => {
+        ipcRenderer.removeListener('scheduler:selectChat', listener)
+      }
+    },
+    onTaskTriggered: (callback: (data: any) => void) => {
+      const listener = (_: any, data: any) => callback(data)
+      ipcRenderer.on('scheduler:taskTriggered', listener)
+      return () => {
+        ipcRenderer.removeListener('scheduler:taskTriggered', listener)
+      }
+    },
+    onTaskCompleted: (callback: (data: any) => void) => {
+      const listener = (_: any, data: any) => callback(data)
+      ipcRenderer.on('scheduler:taskCompleted', listener)
+      return () => {
+        ipcRenderer.removeListener('scheduler:taskCompleted', listener)
+      }
+    }
   },
   mcp: {
     getAllServers: () => ipcRenderer.invoke('mcp:getAllServers'),
@@ -147,7 +186,8 @@ const api = {
     rename: (oldPath: string, newPath: string) => ipcRenderer.invoke('files:rename', { oldPath, newPath }),
     move: (sourcePath: string, targetDirPath: string) => ipcRenderer.invoke('files:move', { sourcePath, targetDirPath }),
     delete: (targetPath: string) => ipcRenderer.invoke('files:delete', targetPath),
-    reveal: (targetPath: string) => ipcRenderer.invoke('files:reveal', targetPath)
+    reveal: (targetPath: string) => ipcRenderer.invoke('files:reveal', targetPath),
+    readFile: (filePath: string) => ipcRenderer.invoke('files:readFile', filePath)
   },
   terminal: {
     run: (params: { runId: string; command: string; cwd?: string; sessionId?: string }) =>
@@ -195,6 +235,48 @@ const api = {
         ipcRenderer.removeListener('terminal:ai:exit', listener)
       }
     }
+  },
+  browser: {
+    onAction: (callback: (request: any) => void) => {
+      const listener = (_: any, data: any) => callback(data)
+      ipcRenderer.on('browser:action:request', listener)
+      return () => {
+        ipcRenderer.removeListener('browser:action:request', listener)
+      }
+    },
+    sendResponse: (response: { requestId: string; success: boolean; data?: any; error?: string }) => {
+      ipcRenderer.send('browser:action:response', response)
+    },
+    openView: (tab?: string) => {
+      ipcRenderer.send('browser:openView', { tab })
+    },
+    onOpenView: (callback: (data?: any) => void) => {
+      const listener = (_: any, data: any) => callback(data)
+      ipcRenderer.on('browser:openView', listener)
+      return () => {
+        ipcRenderer.removeListener('browser:openView', listener)
+      }
+    }
+  },
+  telegram: {
+    getConfig: () => ipcRenderer.invoke('telegram:getConfig'),
+    saveConfig: (patch: any) => ipcRenderer.invoke('telegram:saveConfig', patch),
+    start: () => ipcRenderer.invoke('telegram:start'),
+    stop: () => ipcRenderer.invoke('telegram:stop'),
+    getStatus: () => ipcRenderer.invoke('telegram:getStatus'),
+    testToken: (token: string) => ipcRenderer.invoke('telegram:testToken', { token }),
+    onStatus: (callback: (status: any) => void) => {
+      const listener = (_: any, data: any) => callback(data)
+      ipcRenderer.on('telegram:status', listener)
+      return () => {
+        ipcRenderer.removeListener('telegram:status', listener)
+      }
+    },
+    notifyActiveChat: (chatId: string | null) => {
+      ipcRenderer.send('telegram:activeChatChanged', { chatId })
+    },
+    getModels: () => ipcRenderer.invoke('telegram:getModels'),
+    setModel: (model: string) => ipcRenderer.invoke('telegram:setModel', { model })
   },
   setZoomFactor: (factor: number) => {
     try {

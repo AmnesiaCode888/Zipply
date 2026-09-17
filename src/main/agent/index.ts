@@ -32,6 +32,7 @@ zipplyAgent.addTool(toolRegistry.getTool('schedule'))
 zipplyAgent.addTool(toolRegistry.getTool('call_mcp_tool'))
 zipplyAgent.addTool(toolRegistry.getTool('manage_mcp'))
 zipplyAgent.addTool(toolRegistry.getTool('complete_task'))
+zipplyAgent.addTool(toolRegistry.getTool('browser'))
 
 // 2. Wire read-only tools into AskAgent
 askAgent.addTool(new ReadOnlyFileTool())
@@ -40,6 +41,7 @@ askAgent.addTool(toolRegistry.getTool('search_web'))
 askAgent.addTool(toolRegistry.getTool('read_page'))
 askAgent.addTool(toolRegistry.getTool('read_skill'))
 askAgent.addTool(toolRegistry.getTool('call_mcp_tool'))
+askAgent.addTool(toolRegistry.getTool('browser'))
 
 // 3. Wire tools into TerminalAgent
 terminalAgent.addTool(toolRegistry.getTool('terminal'))
@@ -53,6 +55,7 @@ webSearchAgent.addTool(toolRegistry.getTool('search_web'))
 webSearchAgent.addTool(toolRegistry.getTool('read_page'))
 webSearchAgent.addTool(toolRegistry.getTool('grep_search'))
 webSearchAgent.addTool(toolRegistry.getTool('read_skill'))
+webSearchAgent.addTool(toolRegistry.getTool('browser'))
 
 // 5. Wire tools into WorkerAgent
 workerAgent.addTool(toolRegistry.getTool('file'))
@@ -67,6 +70,7 @@ workerAgent.addTool(toolRegistry.getTool('list_skills'))
 workerAgent.addTool(toolRegistry.getTool('call_mcp_tool'))
 workerAgent.addTool(toolRegistry.getTool('manage_mcp'))
 workerAgent.addTool(toolRegistry.getTool('complete_task'))
+workerAgent.addTool(toolRegistry.getTool('browser'))
 
 // 6. Wire read-only inspection tools into ArchitectAgent
 architectAgent.addTool(new ReadOnlyFileTool())
@@ -75,6 +79,7 @@ architectAgent.addTool(toolRegistry.getTool('search_web'))
 architectAgent.addTool(toolRegistry.getTool('read_page'))
 architectAgent.addTool(toolRegistry.getTool('read_skill'))
 architectAgent.addTool(toolRegistry.getTool('call_mcp_tool'))
+architectAgent.addTool(toolRegistry.getTool('browser'))
 
 /**
  * Run selected agent for one turn.
@@ -134,6 +139,7 @@ export * from './services/LinterService'
 export * from './services/RepoMapService'
 export * from './services/RuleService'
 export * from './tools/CompleteTaskTool'
+export * from './tools/BrowserTool'
 export * from './agents/ArchitectAgent'
 
 

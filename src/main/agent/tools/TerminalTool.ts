@@ -4,10 +4,11 @@ import * as fs from 'fs'
 import { ToolBase, ToolParameterDef, ToolResult, ProgressCallback } from './ToolBase'
 import { Blackboard } from '../core/Blackboard'
 import { TerminalSessionManager } from '../../services/TerminalSessionManager'
-
-function stripAnsi(text: string): string {
-  return text.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '')
-}
+import {
+  stripAnsi,
+  compactTerminalOutputForContext,
+  updateTerminalOutputLines
+} from '../../services/TerminalOutputUtils'
 
 function notifyRenderer(channel: string, data: any): void {
   try {
@@ -404,10 +405,10 @@ export class TerminalTool extends ToolBase {
       }, 1000)
 
       const runId = `ai_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
-      const targetSessionId = args.session_id || `term_ai_${runId}`
+      const targetSessionId = args.session_id || 'term_ai'
       const sessionManager = TerminalSessionManager.getInstance()
 
-      notifyRenderer('terminal:ai:start', { runId, command, cwd: runCwd })
+      notifyRenderer('terminal:ai:start', { runId, command, cwd: runCwd, sessionId: targetSessionId })
 
       const child = exec(
         cmdToRun,
@@ -429,7 +430,9 @@ export class TerminalTool extends ToolBase {
           notifyRenderer('terminal:ai:exit', { runId, code: exitCode })
 
           const combined = (stdout || '') + (stderr ? `\n[STDERR]\n${stderr}` : '')
-          let cleanOutput = stripAnsi(combined).trim()
+          const rawLines = updateTerminalOutputLines([], combined)
+          const compacted = compactTerminalOutputForContext(rawLines, 200)
+          let cleanOutput = compacted.join('\n').trim()
 
           cleanOutput = this._smartTruncateOutput(cleanOutput)
 
@@ -569,8 +572,9 @@ export class TerminalTool extends ToolBase {
     }
 
     const sessionManager = TerminalSessionManager.getInstance()
+    const targetSessionId = args.session_id || `term_bg_${id}`
     sessionManager.recordCommandStart({
-      sessionId: `term_ai_${id}`,
+      sessionId: targetSessionId,
       runId: id,
       command,
       cwd: runCwd,
@@ -579,7 +583,7 @@ export class TerminalTool extends ToolBase {
       pid: child.pid
     })
 
-    notifyRenderer('terminal:ai:start', { runId: id, command, cwd: runCwd, isBackground: true })
+    notifyRenderer('terminal:ai:start', { runId: id, command, cwd: runCwd, sessionId: targetSessionId, isBackground: true })
 
     const appendLog = (data: Buffer | string): void => {
       if (!data) return
@@ -588,15 +592,7 @@ export class TerminalTool extends ToolBase {
       procObj.lastActivityAt = Date.now()
       sessionManager.appendOutput(id, clean)
       notifyRenderer('terminal:ai:data', { runId: id, text: clean })
-      const lines = clean.split(/\r?\n/)
-      for (const line of lines) {
-        if (line.trim().length > 0) {
-          procObj.logs.push(line)
-        }
-      }
-      if (procObj.logs.length > 3000) {
-        procObj.logs = procObj.logs.slice(-3000)
-      }
+      procObj.logs = updateTerminalOutputLines(procObj.logs, clean, 3000)
     }
 
     if (child.stdout) child.stdout.on('data', appendLog)

@@ -11,7 +11,8 @@ import {
   Image as ImageIcon,
   ChevronRight,
   ListTodo,
-  Maximize2
+  Maximize2,
+  Globe
 } from 'lucide-react'
 import { ChatMessage, ChatSession, AttachedImage, ProjectRef } from '../types/chat'
 import { useProjects } from '../hooks/useProjects'
@@ -31,6 +32,7 @@ interface ChatViewProps {
   onSendMessage: (text: string, project?: ProjectRef | null, images?: AttachedImage[]) => void
   onCancel?: () => void
   onOpenSettings?: (tab?: SettingsTab) => void
+  onOpenBrowser?: () => void
 }
 
 interface MessageRowProps {
@@ -316,7 +318,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
   isStreaming = false,
   onSendMessage,
   onCancel,
-  onOpenSettings
+  onOpenSettings,
+  onOpenBrowser
 }) => {
   const [inputText, setInputText] = useState('')
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([])
@@ -552,12 +555,32 @@ export const ChatView: React.FC<ChatViewProps> = ({
   }
 
 
-  const handleMenuItemHover = (type: 'attach' | 'plan' | 'projects'): void => {
+  const handleCreatePlan = (): void => {
+    setShowMenu(false)
+    setShowProjectsSubmenu(false)
+    const current = inputText.trim()
+    if (!current) {
+      setInputText('Составь подробный пошаговый план реализации: ')
+    } else if (!current.toLowerCase().includes('план')) {
+      setInputText(`Составь подробный пошаговый план реализации следующей задачи:\n${inputText}`)
+    }
+    setTimeout(() => {
+      textareaRef.current?.focus()
+    }, 50)
+  }
+
+  const handleOpenBrowserClick = (): void => {
+    setShowMenu(false)
+    setShowProjectsSubmenu(false)
+    onOpenBrowser?.()
+  }
+
+  const handleMenuItemHover = (type: 'attach' | 'plan' | 'browser' | 'projects'): void => {
     if (submenuTimerRef.current) {
       clearTimeout(submenuTimerRef.current)
       submenuTimerRef.current = null
     }
-    if (type === 'attach' || type === 'plan') {
+    if (type === 'attach' || type === 'plan' || type === 'browser') {
       setShowProjectsSubmenu(false)
     } else if (type === 'projects') {
       setShowProjectsSubmenu(true)
@@ -754,14 +777,21 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   <button
                     type="button"
                     className="chat-task-add-menu-item"
-                    onClick={() => {
-                      setShowMenu(false)
-                      setShowProjectsSubmenu(false)
-                    }}
+                    onClick={handleCreatePlan}
                     onMouseEnter={() => handleMenuItemHover('plan')}
                   >
                     <ListTodo size={16} className="chat-task-add-menu-icon" strokeWidth={1.8} />
                     <span className="chat-task-add-menu-label">Создать план</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="chat-task-add-menu-item"
+                    onClick={handleOpenBrowserClick}
+                    onMouseEnter={() => handleMenuItemHover('browser')}
+                  >
+                    <Globe size={16} className="chat-task-add-menu-icon" strokeWidth={1.8} />
+                    <span className="chat-task-add-menu-label">Браузер</span>
                   </button>
 
                   <div

@@ -167,7 +167,8 @@
   -webkit-app-region: drag;
 }
 
-.titlebar-right-closed {
+.titlebar-right-closed,
+.titlebar-right-controls {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -196,9 +197,9 @@
 }
 
 .titlebar-terminal-btn.active {
-  background-color: rgba(255, 255, 255, 0.16);
-  color: #FFFFFF;
-  border-color: rgba(255, 255, 255, 0.28);
+  background-color: var(--btn-bg-active, rgba(255, 255, 255, 0.16));
+  color: var(--text-primary, #FFFFFF);
+  border-color: var(--border-hover, rgba(255, 255, 255, 0.28));
 }
 
 .titlebar-terminal-btn:active {

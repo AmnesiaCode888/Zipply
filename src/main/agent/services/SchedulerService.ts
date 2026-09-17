@@ -8,6 +8,7 @@ import { LocalStorageService } from '../../services/LocalStorageService'
 
 export type ScheduleType = 'once' | 'recurring'
 export type ScheduleStatus = 'active' | 'completed' | 'cancelled' | 'paused' | 'paused_error' | 'missed'
+export type ScheduleChatMode = 'new_chat' | 'same_chat'
 
 export interface ScheduleLogEntry {
   timestamp: string
@@ -24,6 +25,7 @@ export interface ScheduleItem {
   status: ScheduleStatus
   prompt: string
   chatId?: string
+  chatMode?: ScheduleChatMode
   workspacePath?: string
   delaySeconds?: number
   cronExpression?: string
@@ -48,6 +50,7 @@ export interface CreateScheduleOptions {
   prompt: string
   title?: string
   chatId?: string
+  chatMode?: ScheduleChatMode
   workspacePath?: string
   maxIterations?: number
   notifyOs?: boolean
@@ -434,6 +437,7 @@ export class SchedulerService {
 
     const id = `sched_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
     const title = (options.title || '').trim() || (prompt.length > 40 ? prompt.slice(0, 40) + '...' : prompt)
+    const chatMode: ScheduleChatMode = options.chatMode === 'same_chat' ? 'same_chat' : 'new_chat'
 
     const item: ScheduleItem = {
       id,
@@ -442,6 +446,7 @@ export class SchedulerService {
       status: 'active',
       prompt,
       chatId: options.chatId,
+      chatMode,
       workspacePath: options.workspacePath,
       delaySeconds: type === 'once' ? Math.round((nextRunAt.getTime() - now.getTime()) / 1000) : undefined,
       cronExpression: normalizedCron,
@@ -485,6 +490,47 @@ export class SchedulerService {
 
     this._emit('scheduler:taskTriggered', { taskId, title: item.title, prompt: item.prompt })
 
+    // 1. Immediate OS notification at task start
+    if (item.notifyOs) {
+      this._sendOsNotification(
+        `⏳ Запуск задачи: ${item.title}`,
+        item.prompt.slice(0, 150)
+      )
+    }
+
+    // 2. Resolve destination chat (create a new dedicated chat or use current)
+    const chatMode = item.chatMode || 'new_chat'
+    let targetChatId = item.chatId
+
+    if (chatMode === 'new_chat' || !targetChatId) {
+      targetChatId = `chat_sched_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+      const cleanTitle = item.title ? `🕐 ${item.title.replace(/^🕐\s*/, '')}` : `🕐 Задача #${item.id.slice(-4)}`
+      const newChatSession: any = {
+        id: targetChatId,
+        title: cleanTitle,
+        dateGroup: 'Сегодня',
+        messages: [
+          {
+            id: `msg-${Date.now()}-u`,
+            role: 'user',
+            text: item.prompt
+          }
+        ],
+        project: item.workspacePath ? { name: path.basename(item.workspacePath), path: item.workspacePath } : undefined,
+        isScheduled: true,
+        scheduledTaskId: item.id
+      }
+
+      try {
+        const currentChats = LocalStorageService.getStore<any[]>('chats', [])
+        const updatedChats = [newChatSession, ...(Array.isArray(currentChats) ? currentChats : [])]
+        LocalStorageService.setStore('chats', updatedChats, 0)
+        this._emit('scheduler:chatCreated', { chat: newChatSession })
+      } catch (err) {
+        console.warn('[SchedulerService] Failed to create initial chat session:', err)
+      }
+    }
+
     let isSuccess = false
     let resultMessage = ''
 
@@ -505,8 +551,13 @@ export class SchedulerService {
         if (evt.type === 'token') {
           accumulatedOutput += evt.content
         }
-        // Relay event to renderer windows so user sees live output if open
-        this._broadcast('agent:event', { ...evt, isScheduled: true, scheduleId: item.id })
+        // Relay event to renderer windows so user sees live output in the dedicated chat
+        this._broadcast('agent:event', {
+          ...evt,
+          isScheduled: true,
+          scheduleId: item.id,
+          chatId: targetChatId
+        })
       }
 
       await AgentRunner.run(
@@ -515,7 +566,8 @@ export class SchedulerService {
         {
           ...config,
           workspacePath: effectiveWorkspace,
-          baseDir: effectiveWorkspace
+          baseDir: effectiveWorkspace,
+          chatId: targetChatId
         },
         onAgentEvent,
         controller.signal
@@ -541,6 +593,37 @@ export class SchedulerService {
       this._activeExecutions.delete(taskId)
     }
 
+    // Save final assistant message to persistent chat storage
+    try {
+      const assistantMsg: any = {
+        id: `msg-${Date.now()}-a`,
+        role: 'assistant',
+        text: resultMessage,
+        segments: [
+          {
+            id: `seg-text-${Date.now()}`,
+            type: 'text',
+            content: resultMessage
+          }
+        ]
+      }
+      const allChats = LocalStorageService.getStore<any[]>('chats', [])
+      if (Array.isArray(allChats)) {
+        const found = allChats.find((c) => c && c.id === targetChatId)
+        if (found) {
+          if (!Array.isArray(found.messages)) found.messages = []
+          const hasAssistant = found.messages.some((m: any) => m.id === assistantMsg.id)
+          if (!hasAssistant) {
+            found.messages.push(assistantMsg)
+            LocalStorageService.setStore('chats', allChats, 0)
+            this._emit('scheduler:chatUpdated', { chatId: targetChatId, chat: found })
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[SchedulerService] Failed to persist finished chat message:', err)
+    }
+
     const durationMs = Date.now() - startTime
     item.executionCount++
     item.lastRunAt = now.toISOString()
@@ -555,11 +638,12 @@ export class SchedulerService {
     // Keep log count bounded
     if (item.logs.length > 30) item.logs = item.logs.slice(0, 30)
 
-    // OS Notification
+    // OS Notification on completion
     if (item.notifyOs) {
       this._sendOsNotification(
-        `zipply: ${item.title}`,
-        isSuccess ? resultMessage.slice(0, 150) : `Ошибка: ${item.lastError}`
+        isSuccess ? `✅ Задача выполнена: ${item.title}` : `❌ Ошибка задачи: ${item.title}`,
+        isSuccess ? resultMessage.slice(0, 150) : `Ошибка: ${item.lastError || resultMessage.slice(0, 150)}`,
+        targetChatId
       )
     }
 
@@ -676,7 +760,7 @@ export class SchedulerService {
     return this._items.get(taskId) || null
   }
 
-  private static _sendOsNotification(title: string, body: string): void {
+  private static _sendOsNotification(title: string, body: string, targetChatId?: string): void {
     try {
       if (Notification && Notification.isSupported()) {
         const notif = new Notification({
@@ -691,6 +775,9 @@ export class SchedulerService {
             if (win.isMinimized()) win.restore()
             win.show()
             win.focus()
+            if (targetChatId) {
+              win.webContents.send('scheduler:selectChat', targetChatId)
+            }
           }
         })
         notif.show()

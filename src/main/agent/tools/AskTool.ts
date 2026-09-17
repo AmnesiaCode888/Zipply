@@ -265,6 +265,8 @@ export class AskTool extends ToolBase {
             return 'read_skill'
           case 'save_skill':
             return 'save_skill'
+          case 'browser':
+            return 'browser'
           default:
             return 'read'
         }
@@ -272,6 +274,14 @@ export class AskTool extends ToolBase {
 
       const getSubagentActionLabel = (toolName: string, action?: string): string => {
         switch (toolName) {
+          case 'browser':
+            if (action === 'navigate') return 'Переход'
+            if (action === 'screenshot') return 'Скриншот'
+            if (action === 'click') return 'Клик'
+            if (action === 'type') return 'Ввод'
+            if (action === 'scroll') return 'Прокрутка'
+            if (action === 'get_content') return 'Чтение'
+            return 'Браузер'
           case 'file':
             if (action === 'edit') return 'Edit'
             if (action === 'write' || action === 'append') return 'Create'
@@ -301,6 +311,12 @@ export class AskTool extends ToolBase {
 
       const getSubagentTarget = (toolName: string, tArgs: Record<string, any> = {}): string => {
         if (tArgs.description) return String(tArgs.description)
+        if (toolName === 'browser') {
+          if (tArgs.url) return String(tArgs.url)
+          if (tArgs.action === 'click') return tArgs.selector || tArgs.text || ''
+          if (tArgs.action === 'type') return tArgs.selector ? `"${tArgs.text || ''}" → ${tArgs.selector}` : (tArgs.text || '')
+          return tArgs.action || ''
+        }
         if (toolName === 'file') return tArgs.path || tArgs.dest_path || ''
         if (toolName === 'grep_search') return tArgs.query ? `"${tArgs.query}"` : ''
         if (toolName === 'terminal') return tArgs.command || tArgs.action || ''

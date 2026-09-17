@@ -17,6 +17,7 @@ import {
 import { SkillItemUI } from '../../env'
 import { SkillEditorModal } from './SkillEditorModal'
 import { SkillImportModal } from './SkillImportModal'
+import { CodexTransferModal } from './CodexTransferModal'
 import { useAiSettingsContext } from '../../hooks/AiSettingsContext'
 import './SkillsView.css'
 
@@ -24,11 +25,12 @@ export const SkillsView: React.FC = () => {
   const { config } = useAiSettingsContext()
   const [skills, setSkills] = useState<SkillItemUI[]>([])
   const [searchQuery, setSearchQuery] = useState('')
-  const [filterType, setFilterType] = useState<'all' | 'core' | 'extra' | 'workspace' | 'external'>('all')
+  const [filterType, setFilterType] = useState<string>('all')
   const [isLoading, setIsLoading] = useState(true)
   const [editingSkill, setEditingSkill] = useState<SkillItemUI | null>(null)
   const [isEditorModalOpen, setIsEditorModalOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [isCodexTransferModalOpen, setIsCodexTransferModalOpen] = useState(false)
   const [expandedSkillIds, setExpandedSkillIds] = useState<Set<string>>(new Set())
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
@@ -92,8 +94,8 @@ export const SkillsView: React.FC = () => {
       if (res.success) {
         showToast(
           res.newIsCore
-            ? `«${skill.name}» теперь активен всегда`
-            : `«${skill.name}» переведен в каталог`
+            ? `«${skill.name}» загружается в память`
+            : `«${skill.name}» переведен в режим по требованию`
         )
         await loadSkills()
       } else {
@@ -163,13 +165,18 @@ export const SkillsView: React.FC = () => {
   const [searchResults, setSearchResults] = useState<SkillItemUI[] | null>(null)
 
   const coreCount = useMemo(() => skills.filter((s) => s.isCore).length, [skills])
-  const extraCount = useMemo(() => skills.filter((s) => !s.isCore).length, [skills])
+  const systemCount = useMemo(() => skills.filter((s) => s.category === 'system').length, [skills])
+  const toolsCount = useMemo(() => skills.filter((s) => s.category === 'tools').length, [skills])
+  const engineeringCount = useMemo(
+    () => skills.filter((s) => s.category === 'engineering').length,
+    [skills]
+  )
   const workspaceCount = useMemo(
-    () => skills.filter((s) => s.source === 'workspace').length,
+    () => skills.filter((s) => s.source === 'workspace' || s.category === 'workspace').length,
     [skills]
   )
   const codexCount = useMemo(
-    () => skills.filter((s) => s.source === 'codex').length,
+    () => skills.filter((s) => s.source === 'codex' || s.category === 'codex').length,
     [skills]
   )
 
@@ -202,26 +209,31 @@ export const SkillsView: React.FC = () => {
     }
 
     return skills.filter((s) => {
-      if (filterType === 'core' && !s.isCore) return false
-      if (filterType === 'extra' && s.isCore) return false
-      if (filterType === 'workspace' && s.source !== 'workspace') return false
-      if (filterType === 'external' && s.source !== 'codex') return false
-      return true
+      if (filterType === 'all') return true
+      if (filterType === 'core') return s.isCore
+      if (filterType === 'system') return s.category === 'system'
+      if (filterType === 'tools') return s.category === 'tools'
+      if (filterType === 'engineering') return s.category === 'engineering'
+      if (filterType === 'workspace') return s.source === 'workspace' || s.category === 'workspace'
+      if (filterType === 'external') return s.source === 'codex' || s.category === 'codex'
+      return (s.category || '').toLowerCase() === filterType.toLowerCase()
     })
   }, [skills, filterType, searchQuery, searchResults])
 
-  const getSourceBadge = (source: string, isFolder?: boolean) => {
-    switch (source) {
+  const getCategoryBadgeLabel = (category?: string) => {
+    switch ((category || '').toLowerCase()) {
+      case 'system':
+        return 'Система'
+      case 'tools':
+        return 'Инструмент'
+      case 'engineering':
+        return 'Разработка'
       case 'workspace':
-        return <span className="skill-source-badge ws">📁 Проект</span>
+        return 'Проект'
       case 'codex':
-        return <span className="skill-source-badge codex">✨ Codex</span>
+        return 'Codex'
       default:
-        return isFolder ? (
-          <span className="skill-source-badge folder">📦 Пакет</span>
-        ) : (
-          <span className="skill-source-badge global">Глобальный</span>
-        )
+        return 'Навык'
     }
   }
 
@@ -233,85 +245,69 @@ export const SkillsView: React.FC = () => {
     return (
       <div
         key={skill.id}
-        className={`skill-card ${!isSkillEnabled ? 'is-disabled' : ''} ${skill.similarityScore && skill.similarityScore >= 60 ? 'high-relevance' : ''}`}
+        className={`skill-card ${!isSkillEnabled ? 'is-disabled' : ''}`}
       >
         <div className="skill-card-top-row">
           <div className="skill-title-block">
             <h4 className="skill-name-heading">{skill.name}</h4>
-            {getSourceBadge(skill.source, skill.isFolder)}
-            {skill.similarityScore !== undefined && skill.similarityScore > 0 && (
-              <span className={`skill-similarity-badge ${skill.similarityScore >= 75 ? 'top' : ''}`}>
-                ⚡ {skill.similarityScore}% совпадение
-              </span>
+            <span className="skill-badge category">{getCategoryBadgeLabel(skill.category)}</span>
+            {skill.source === 'workspace' && (
+              <span className="skill-badge source">Проект</span>
             )}
-            {skill.matchReason && (
-              <span className="skill-match-reason-pill">{skill.matchReason}</span>
+            {skill.source === 'codex' && (
+              <span className="skill-badge source">Codex</span>
             )}
-            <span className="skill-tokens-badge">~{approxTokens} tok</span>
+            <span className="skill-badge tokens">~{approxTokens} tok</span>
             {skill.files && skill.files.length > 0 && (
-              <span className="skill-files-count-badge" title={skill.files.join('\n')}>
+              <span className="skill-badge files" title={skill.files.join('\n')}>
                 <FolderTree size={11} />
-                <span>{skill.files.length} файлов</span>
+                <span>{skill.files.length}</span>
               </span>
             )}
           </div>
 
           <div className="skill-top-controls">
-            {/* Quick Enable/Disable toggle */}
             <button
-              className={`skill-power-pill ${isSkillEnabled ? 'active' : 'inactive'}`}
-              onClick={() => handleToggleSkillEnabled(skill)}
-              title={isSkillEnabled ? 'Нажмите, чтобы отключить навык' : 'Нажмите, чтобы включить навык'}
+              className={`skill-switch-btn ${skill.isCore ? 'active' : ''}`}
+              onClick={() => handleToggleCore(skill)}
+              title={
+                skill.isCore
+                  ? 'В памяти: всегда загружен в системный контекст'
+                  : 'По требованию: загружается агентом по необходимости'
+              }
             >
-              <span className="skill-power-dot" />
-              <span>{isSkillEnabled ? 'Вкл' : 'Выкл'}</span>
+              <span>{skill.isCore ? 'В памяти' : 'По требованию'}</span>
             </button>
 
-            {/* Core / Extra switch */}
             <button
-              className={`skill-type-switch-pill ${skill.isCore ? 'is-core' : ''}`}
-              onClick={() => handleToggleCore(skill)}
-              title="Нажмите для переключения режима"
+              className={`skill-switch-btn power ${isSkillEnabled ? 'active' : ''}`}
+              onClick={() => handleToggleSkillEnabled(skill)}
+              title={isSkillEnabled ? 'Отключить навык' : 'Включить навык'}
             >
-              <span className="skill-type-dot" />
-              <span>{skill.isCore ? 'В памяти' : 'По требованию'}</span>
+              <span className="skill-dot" />
+              <span>{isSkillEnabled ? 'Вкл' : 'Выкл'}</span>
             </button>
           </div>
         </div>
 
         <p className="skill-description-text">{skill.description}</p>
 
-        {/* Metadata Tags, Globs, Triggers */}
-        {(Boolean(skill.globs?.length) ||
-          Boolean(skill.triggers?.length) ||
-          Boolean(skill.tags?.length)) && (
-          <div className="skill-chips-row">
-            {skill.globs && skill.globs.length > 0 && (
-              <div className="skill-meta-chip globs">
-                <span>Маски:</span>
-                <code>{skill.globs.join(', ')}</code>
-              </div>
-            )}
+        {/* Metadata: triggers & globs in clean monochrome */}
+        {((skill.triggers && skill.triggers.length > 0) ||
+          (skill.globs && skill.globs.length > 0)) && (
+          <div className="skill-meta-row">
             {skill.triggers && skill.triggers.length > 0 && (
-              <div className="skill-meta-chip triggers">
-                <span>Триггеры:</span>
-                <code>{skill.triggers.slice(0, 3).join(', ')}</code>
+              <div className="skill-meta-item">
+                <span className="skill-meta-label">Триггеры:</span>
+                <span className="skill-meta-val">{skill.triggers.slice(0, 4).join(', ')}</span>
               </div>
             )}
-            {skill.tags
-              ?.filter(
-                (t) =>
-                  t !== 'global' &&
-                  t !== 'core' &&
-                  t !== 'extra' &&
-                  t !== 'workspace' &&
-                  t !== 'codex'
-              )
-              .map((t) => (
-                <span key={t} className="skill-tag-pill">
-                  #{t}
-                </span>
-              ))}
+            {skill.globs && skill.globs.length > 0 && (
+              <div className="skill-meta-item">
+                <span className="skill-meta-label">Маски:</span>
+                <span className="skill-meta-val">{skill.globs.join(', ')}</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -321,7 +317,7 @@ export const SkillsView: React.FC = () => {
             onClick={() => handleToggleExpand(skill.id)}
           >
             <span>Инструкция ({skill.content.split('\n').length} строк)</span>
-            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
           </button>
 
           {isExpanded && <pre className="skill-code-preview">{skill.content}</pre>}
@@ -330,49 +326,49 @@ export const SkillsView: React.FC = () => {
         <div className="skill-card-footer-row">
           <span className="skill-status-tag">
             {!isSkillEnabled
-              ? 'Отключен (агент игнорирует этот навык)'
+              ? 'Отключен'
               : skill.isCore
-                ? 'Загружается в каждый запрос'
-                : `Загружается через read_skill("${skill.name}")`}
+              ? 'В системном промпте'
+              : `Загружается по требованию: read_skill("${skill.name}")`}
           </span>
 
           <div className="skill-button-group">
             <button
-              className="skill-ghost-btn"
+              className="skill-action-btn"
               onClick={() => handleCopyContent(skill)}
-              title="Скопировать"
+              title="Скопировать текст"
             >
               {copiedId === skill.id ? (
                 <>
-                  <Check size={13} color="#ffffff" />
+                  <Check size={12} />
                   <span>Скопировано</span>
                 </>
               ) : (
                 <>
-                  <Copy size={13} />
+                  <Copy size={12} />
                   <span>Копировать</span>
                 </>
               )}
             </button>
 
             <button
-              className="skill-ghost-btn"
+              className="skill-action-btn"
               onClick={() => {
                 setEditingSkill(skill)
                 setIsEditorModalOpen(true)
               }}
-              title="Редактировать"
+              title="Редактировать навык"
             >
-              <Edit3 size={13} />
+              <Edit3 size={12} />
               <span>Изменить</span>
             </button>
 
             <button
-              className="skill-ghost-btn danger"
+              className="skill-action-btn danger"
               onClick={() => handleDelete(skill)}
-              title="Удалить"
+              title="Удалить навык"
             >
-              <Trash2 size={13} />
+              <Trash2 size={12} />
             </button>
           </div>
         </div>
@@ -382,7 +378,6 @@ export const SkillsView: React.FC = () => {
 
   return (
     <div className="skills-view-container">
-      {/* Toast Notification */}
       {toastMessage && (
         <div className="skills-toast">
           <span>{toastMessage}</span>
@@ -393,9 +388,9 @@ export const SkillsView: React.FC = () => {
         {/* Header */}
         <div className="skills-header">
           <div className="skills-header-left">
-            <h2 className="skills-page-title">Навыки и инструкции</h2>
+            <h2 className="skills-page-title">Навыки</h2>
             <p className="skills-page-subtitle">
-              Универсальная библиотека правил Codex, Antigravity и кастомных навыков
+              Правила поведения, инструменты и стандарты разработки
             </p>
           </div>
 
@@ -405,26 +400,26 @@ export const SkillsView: React.FC = () => {
               onClick={handleOpenFolder}
               title="Открыть папку навыков в Проводнике"
             >
-              <FolderOpen size={14} />
+              <FolderOpen size={13} />
               <span>Папка</span>
             </button>
 
             <button
               className="skills-header-btn"
               onClick={() => setIsImportModalOpen(true)}
-              title="Импорт из файлов, GitHub или Codex"
+              title="Импорт из файлов или GitHub"
             >
-              <ArrowDownToLine size={14} />
+              <ArrowDownToLine size={13} />
               <span>Импорт</span>
             </button>
 
             <button
               className="skills-icon-btn"
               onClick={loadSkills}
-              title="Обновить список"
+              title="Обновить"
               disabled={isLoading}
             >
-              <RefreshCw size={14} className={isLoading ? 'spinning' : ''} />
+              <RefreshCw size={13} className={isLoading ? 'spinning' : ''} />
             </button>
 
             <button
@@ -434,70 +429,34 @@ export const SkillsView: React.FC = () => {
                 setIsEditorModalOpen(true)
               }}
             >
-              <Plus size={15} />
-              <span>Новый навык</span>
+              <Plus size={14} />
+              <span>Создать</span>
             </button>
           </div>
         </div>
 
-        {/* Top Metric Cards (Horizontal Grid) */}
-        <div className="skills-metrics-grid">
-          <div
-            className={`skills-stat-box ${filterType === 'all' ? 'active' : ''}`}
-            onClick={() => setFilterType('all')}
-          >
-            <span className="skills-stat-number">{skills.length}</span>
-            <span className="skills-stat-label">Всего навыков</span>
-          </div>
-
-          <div
-            className={`skills-stat-box ${filterType === 'core' ? 'active' : ''}`}
-            onClick={() => setFilterType('core')}
-          >
-            <span className="skills-stat-number">{coreCount}</span>
-            <span className="skills-stat-label">В памяти (Core)</span>
-          </div>
-
-          <div
-            className={`skills-stat-box ${filterType === 'extra' ? 'active' : ''}`}
-            onClick={() => setFilterType('extra')}
-          >
-            <span className="skills-stat-number">{extraCount}</span>
-            <span className="skills-stat-label">По требованию (Extra)</span>
-          </div>
-
-          <div
-            className={`skills-stat-box ${filterType === 'workspace' ? 'active' : ''}`}
-            onClick={() => setFilterType('workspace')}
-          >
-            <span className="skills-stat-number">{workspaceCount}</span>
-            <span className="skills-stat-label">В проекте (.skills)</span>
-          </div>
-        </div>
-
-        {/* Controls: Search and Filter Tabs */}
+        {/* Controls: Search and Tabs */}
         <div className="skills-controls-row">
           <div className="skills-search-field">
-            <Search size={15} className="skills-search-icon" />
+            <Search size={13} className="skills-search-icon" />
             <input
               type="text"
-              placeholder="Поиск по имени, описанию, триггерам..."
+              placeholder="Поиск по названию или триггерам..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <div className="skills-search-trail">
-              {isSearching && <RefreshCw size={13} className="skills-search-spinning-icon" />}
-              {searchQuery && (
-                <button
-                  type="button"
-                  className="skills-search-reset"
-                  onClick={() => setSearchQuery('')}
-                  title="Очистить поиск"
-                >
-                  ×
-                </button>
-              )}
-            </div>
+            {isSearching ? (
+              <RefreshCw size={11} className="skills-search-spinner spinning" />
+            ) : searchQuery ? (
+              <button
+                type="button"
+                className="skills-search-reset"
+                onClick={() => setSearchQuery('')}
+                title="Очистить"
+              >
+                ×
+              </button>
+            ) : null}
           </div>
 
           <div className="skills-segmented-tabs">
@@ -505,51 +464,70 @@ export const SkillsView: React.FC = () => {
               className={`skills-tab-pill ${filterType === 'all' ? 'active' : ''}`}
               onClick={() => setFilterType('all')}
             >
-              Все ({skills.length})
+              <span>Все</span>
+              <span className="tab-count">{skills.length}</span>
             </button>
+            <button
+              className={`skills-tab-pill ${filterType === 'system' ? 'active' : ''}`}
+              onClick={() => setFilterType('system')}
+            >
+              <span>Система</span>
+              <span className="tab-count">{systemCount}</span>
+            </button>
+            <button
+              className={`skills-tab-pill ${filterType === 'tools' ? 'active' : ''}`}
+              onClick={() => setFilterType('tools')}
+            >
+              <span>Инструменты</span>
+              <span className="tab-count">{toolsCount}</span>
+            </button>
+            <button
+              className={`skills-tab-pill ${filterType === 'engineering' ? 'active' : ''}`}
+              onClick={() => setFilterType('engineering')}
+            >
+              <span>Разработка</span>
+              <span className="tab-count">{engineeringCount}</span>
+            </button>
+            {workspaceCount > 0 && (
+              <button
+                className={`skills-tab-pill ${filterType === 'workspace' ? 'active' : ''}`}
+                onClick={() => setFilterType('workspace')}
+              >
+                <span>Проект</span>
+                <span className="tab-count">{workspaceCount}</span>
+              </button>
+            )}
+            {codexCount > 0 && (
+              <button
+                className={`skills-tab-pill ${filterType === 'external' ? 'active' : ''}`}
+                onClick={() => setFilterType('external')}
+              >
+                <span>Codex</span>
+                <span className="tab-count">{codexCount}</span>
+              </button>
+            )}
             <button
               className={`skills-tab-pill ${filterType === 'core' ? 'active' : ''}`}
               onClick={() => setFilterType('core')}
             >
-              Core ({coreCount})
-            </button>
-            <button
-              className={`skills-tab-pill ${filterType === 'extra' ? 'active' : ''}`}
-              onClick={() => setFilterType('extra')}
-            >
-              Extra ({extraCount})
-            </button>
-            <button
-              className={`skills-tab-pill ${filterType === 'workspace' ? 'active' : ''}`}
-              onClick={() => setFilterType('workspace')}
-            >
-              Проектные ({workspaceCount})
-            </button>
-            <button
-              className={`skills-tab-pill ${filterType === 'external' ? 'active' : ''}`}
-              onClick={() => setFilterType('external')}
-            >
-              Codex ({codexCount})
+              <span>В памяти</span>
+              <span className="tab-count">{coreCount}</span>
             </button>
           </div>
         </div>
 
-        {/* Skills List */}
+        {/* Skills List — Single Unified Stream */}
         <div className="skills-list-section">
           {isLoading ? (
             <div className="skills-loading-block">
-              <RefreshCw size={20} className="spinning" />
+              <RefreshCw size={16} className="spinning" />
               <span>Загрузка...</span>
             </div>
           ) : filteredSkills.length === 0 ? (
             <div className="skills-empty-block">
-              <FileCode2 size={32} strokeWidth={1.5} color="var(--text-muted, #858585)" />
-              <h4>Навыки не найдены</h4>
-              <p>
-                {searchQuery
-                  ? 'По вашему запросу ничего не найдено.'
-                  : 'Список навыков пуст. Нажмите «Новый навык» или «Импорт».'}
-              </p>
+              <FileCode2 size={24} strokeWidth={1.5} />
+              <h4>Ничего не найдено</h4>
+              <p>По вашему запросу навыки не найдены.</p>
             </div>
           ) : (
             filteredSkills.map(renderSkillCard)
@@ -577,7 +555,17 @@ export const SkillsView: React.FC = () => {
           loadSkills()
         }}
       />
+
+      {/* Codex Transfer Modal */}
+      <CodexTransferModal
+        isOpen={isCodexTransferModalOpen}
+        onClose={() => setIsCodexTransferModalOpen(false)}
+        onSuccess={(msg) => {
+          showToast(msg)
+          loadSkills()
+        }}
+        skills={skills}
+      />
     </div>
   )
 }
-

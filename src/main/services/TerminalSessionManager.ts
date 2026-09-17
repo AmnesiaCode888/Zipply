@@ -1,8 +1,9 @@
 import { ChildProcess, execSync } from 'child_process'
-
-function stripAnsi(text: string): string {
-  return text.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '')
-}
+import {
+  stripAnsi,
+  updateTerminalOutputLines,
+  compactTerminalOutputForContext
+} from './TerminalOutputUtils'
 
 export interface TerminalCommandEntry {
   id: string
@@ -214,21 +215,13 @@ export class TerminalSessionManager {
   }
 
   public appendOutput(runId: string, text: string): void {
-    const clean = stripAnsi(text)
-    if (!clean) return
-
-    const lines = clean.split(/\r?\n/)
+    if (!text) return
 
     for (const session of this.sessions.values()) {
       const entry = session.entries.find((e) => e.id === runId)
       if (entry) {
         session.lastActivity = Date.now()
-        for (const line of lines) {
-          entry.output.push(line)
-        }
-        if (entry.output.length > this.maxOutputLinesPerEntry) {
-          entry.output = entry.output.slice(-this.maxOutputLinesPerEntry)
-        }
+        entry.output = updateTerminalOutputLines(entry.output, text, this.maxOutputLinesPerEntry)
         return
       }
     }
@@ -424,9 +417,9 @@ export class TerminalSessionManager {
       out += `Status: ${exitStr}\n`
 
       if (entry.output.length > 0) {
-        const slice = entry.output.slice(-maxLines)
-        out += `Output (${slice.length} lines):\n`
-        out += slice.join('\n') + '\n'
+        const compacted = compactTerminalOutputForContext(entry.output, maxLines)
+        out += `Output (${compacted.length} lines):\n`
+        out += compacted.join('\n') + '\n'
       } else {
         out += `Output: (no output)\n`
       }

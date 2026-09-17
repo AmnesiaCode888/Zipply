@@ -11,6 +11,9 @@ export interface ProviderPresetInfo {
   badge?: string
   defaultEmbeddingModel?: string
   recommendedEmbeddingModels?: string[]
+  defaultContextLength?: number
+  defaultTemperature?: number
+  defaultMaxTokens?: number
 }
 
 export const PROVIDER_PRESETS: ProviderPresetInfo[] = [
@@ -121,7 +124,10 @@ export const PROVIDER_PRESETS: ProviderPresetInfo[] = [
     badge: 'Локально',
     placeholderKey: 'Не требуется',
     defaultEmbeddingModel: 'nomic-embed-text',
-    recommendedEmbeddingModels: ['nomic-embed-text', 'bge-m3', 'all-minilm']
+    recommendedEmbeddingModels: ['nomic-embed-text', 'bge-m3', 'all-minilm'],
+    defaultContextLength: 32768,
+    defaultTemperature: 0.7,
+    defaultMaxTokens: 4096
   },
   {
     id: 'lmstudio',
@@ -132,7 +138,10 @@ export const PROVIDER_PRESETS: ProviderPresetInfo[] = [
     badge: 'Локально',
     placeholderKey: 'Не требуется',
     defaultEmbeddingModel: 'text-embedding-nomic-embed-text-v1.5',
-    recommendedEmbeddingModels: ['text-embedding-nomic-embed-text-v1.5', 'bge-m3']
+    recommendedEmbeddingModels: ['text-embedding-nomic-embed-text-v1.5', 'bge-m3'],
+    defaultContextLength: 32768,
+    defaultTemperature: 0.7,
+    defaultMaxTokens: 4096
   },
   {
     id: 'vllm',
@@ -143,18 +152,36 @@ export const PROVIDER_PRESETS: ProviderPresetInfo[] = [
     badge: 'Локально',
     placeholderKey: 'Не требуется',
     defaultEmbeddingModel: 'bge-m3',
-    recommendedEmbeddingModels: ['bge-m3', 'nomic-embed-text']
+    recommendedEmbeddingModels: ['bge-m3', 'nomic-embed-text'],
+    defaultContextLength: 32768,
+    defaultTemperature: 0.7,
+    defaultMaxTokens: 4096
   },
 
   // Custom
   {
+    id: 'custom_provider',
+    name: 'Свой провайдер',
+    category: 'custom',
+    defaultBaseUrl: 'https://api.openai.com/v1',
+    requiresKey: false,
+    placeholderKey: 'sk-... (или оставьте пустым)',
+    badge: 'OpenAI API',
+    defaultContextLength: 32768,
+    defaultTemperature: 0.7,
+    defaultMaxTokens: 4096
+  },
+  {
     id: 'custom',
     name: 'Свой сервер',
     category: 'custom',
-    defaultBaseUrl: 'https://api.example.com/v1',
+    defaultBaseUrl: 'http://localhost:8000/v1',
     requiresKey: false,
-    placeholderKey: 'Ключ (если требуется)',
-    recommendedEmbeddingModels: ['text-embedding-3-small', 'nomic-embed-text', 'bge-m3']
+    placeholderKey: 'Ключ (необязательно)',
+    badge: 'Локально / Self-hosted',
+    defaultContextLength: 32768,
+    defaultTemperature: 0.7,
+    defaultMaxTokens: 4096
   }
 ]
 
@@ -185,6 +212,7 @@ const DEFAULT_CONFIG: AiConfig = {
   tavilyKey: '',
   temperature: 0.7,
   maxTokens: 4096,
+  contextLength: 32768,
   stream: true,
   baseDir: '',
   embeddingModel: '',
@@ -487,7 +515,10 @@ export function useAiSettings() {
         baseUrl: target.baseUrl,
         apiKey: target.apiKey,
         model: target.model || '',
-        fastModel: target.fastModel || target.model || '',
+        fastModel: target.fastModel || '',
+        contextLength: target.contextLength !== undefined ? target.contextLength : prev.contextLength,
+        temperature: target.temperature !== undefined ? target.temperature : prev.temperature,
+        maxTokens: target.maxTokens !== undefined ? target.maxTokens : prev.maxTokens,
         embeddingModel: target.embeddingModel !== undefined ? target.embeddingModel : prev.embeddingModel,
         embeddingBaseUrl: target.embeddingBaseUrl !== undefined ? target.embeddingBaseUrl : prev.embeddingBaseUrl
       }
@@ -502,7 +533,7 @@ export function useAiSettings() {
     const fullProvider: ConnectedProvider = {
       ...newProv,
       id,
-      fastModel: newProv.fastModel || newProv.model || ''
+      fastModel: newProv.fastModel || ''
     }
 
     setConfig((prev) => {
@@ -517,7 +548,10 @@ export function useAiSettings() {
         baseUrl: fullProvider.baseUrl,
         apiKey: fullProvider.apiKey,
         model: fullProvider.model || '',
-        fastModel: fullProvider.fastModel || fullProvider.model || '',
+        fastModel: fullProvider.fastModel || '',
+        contextLength: fullProvider.contextLength !== undefined ? fullProvider.contextLength : prev.contextLength,
+        temperature: fullProvider.temperature !== undefined ? fullProvider.temperature : prev.temperature,
+        maxTokens: fullProvider.maxTokens !== undefined ? fullProvider.maxTokens : prev.maxTokens,
         embeddingModel: fullProvider.embeddingModel !== undefined ? fullProvider.embeddingModel : prev.embeddingModel,
         embeddingBaseUrl: fullProvider.embeddingBaseUrl !== undefined ? fullProvider.embeddingBaseUrl : prev.embeddingBaseUrl
       }
@@ -532,8 +566,7 @@ export function useAiSettings() {
       const currentList = prev.connectedProviders || []
       const updatedList = currentList.map((p) => {
         if (p.id === id) {
-          const nextModel = updates.model !== undefined ? updates.model : p.model
-          const nextFastModel = updates.fastModel !== undefined ? updates.fastModel : (updates.model || p.fastModel || nextModel)
+          const nextFastModel = updates.fastModel !== undefined ? updates.fastModel : (p.fastModel || '')
           return { ...p, ...updates, fastModel: nextFastModel }
         }
         return p
@@ -548,8 +581,11 @@ export function useAiSettings() {
               baseUrl: updates.baseUrl !== undefined ? updates.baseUrl : prev.baseUrl,
               apiKey: updates.apiKey !== undefined ? updates.apiKey : prev.apiKey,
               model: updates.model !== undefined ? updates.model : prev.model,
-              fastModel: updates.fastModel !== undefined ? updates.fastModel : (updates.model || prev.fastModel || updates.model || prev.model),
+              fastModel: updates.fastModel !== undefined ? updates.fastModel : (prev.fastModel || ''),
               providerPreset: updates.providerId !== undefined ? updates.providerId : prev.providerPreset,
+              contextLength: updates.contextLength !== undefined ? updates.contextLength : prev.contextLength,
+              temperature: updates.temperature !== undefined ? updates.temperature : prev.temperature,
+              maxTokens: updates.maxTokens !== undefined ? updates.maxTokens : prev.maxTokens,
               embeddingModel: updates.embeddingModel !== undefined ? updates.embeddingModel : prev.embeddingModel,
               embeddingBaseUrl: updates.embeddingBaseUrl !== undefined ? updates.embeddingBaseUrl : prev.embeddingBaseUrl
             }
@@ -583,7 +619,7 @@ export function useAiSettings() {
               baseUrl: nextActiveProv.baseUrl,
               apiKey: nextActiveProv.apiKey,
               model: nextActiveProv.model || '',
-              fastModel: nextActiveProv.fastModel || nextActiveProv.model || '',
+              fastModel: nextActiveProv.fastModel || '',
               embeddingModel: nextActiveProv.embeddingModel || '',
               embeddingBaseUrl: nextActiveProv.embeddingBaseUrl || ''
             }
@@ -727,6 +763,9 @@ export function useAiSettings() {
           model: modelToSet,
           models: service.models,
           fastModel: modelToSet,
+          contextLength: preset?.defaultContextLength || 32768,
+          temperature: preset?.defaultTemperature ?? 0.7,
+          maxTokens: preset?.defaultMaxTokens || 4096,
           embeddingModel: preset?.defaultEmbeddingModel || '',
           requiresKey: false
         }
@@ -743,6 +782,9 @@ export function useAiSettings() {
         apiKey: '',
         model: activeTarget?.model || '',
         fastModel: activeTarget?.fastModel || activeTarget?.model || '',
+        contextLength: activeTarget?.contextLength || 32768,
+        temperature: activeTarget?.temperature ?? 0.7,
+        maxTokens: activeTarget?.maxTokens || 4096,
         embeddingModel: activeTarget?.embeddingModel || prev.embeddingModel || ''
       }
 

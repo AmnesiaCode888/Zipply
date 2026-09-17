@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 import type { AgentEvent } from '../../shared/agentEvents'
+import type { TelegramConfig, TelegramBotStatus } from './types/settings'
 
 export interface MemoryItemUI {
   id: string
@@ -53,6 +54,9 @@ export interface SkillItemUI {
   files?: string[]
   enabled?: boolean
   suite?: string
+  category?: string
+  categoryLabel?: string
+  categoryIcon?: string
   embedding?: number[]
   similarityScore?: number
   matchReason?: string
@@ -120,6 +124,13 @@ export interface WindowApi {
       Promise<{ success: boolean; enabled: boolean }>
     togglePackage: (skillNames: string[], enabled: boolean) =>
       Promise<{ success: boolean; count: number }>
+    toggleCategory: (category: string, enabled: boolean, workspacePath?: string) =>
+      Promise<{ success: boolean; count: number }>
+    transfer: (
+      items: Array<{ name: string; sourcePath: string; isFolder?: boolean }>,
+      targetCategory?: string,
+      isCore?: boolean
+    ) => Promise<{ success: boolean; count: number; error?: string }>
     deleteMultiple: (items: Array<{ name: string; isCore?: boolean; sourcePath?: string }>) =>
       Promise<{ success: boolean; deletedCount: number }>
     openFolder: () => Promise<{ success: boolean; path: string; error?: string }>
@@ -142,6 +153,20 @@ export interface WindowApi {
       Promise<{ success: boolean; count: number; error?: string }>
     exportConfig: () =>
       Promise<{ success: boolean; json?: string; error?: string }>
+  }
+  schedule?: {
+    getAll: () => Promise<any[]>
+    get: (id: string) => Promise<any>
+    create: (options: any) => Promise<{ success: boolean; item?: any; error?: string }>
+    cancel: (id: string) => Promise<boolean>
+    pause: (id: string) => Promise<boolean>
+    resume: (id: string) => Promise<boolean>
+    trigger: (id: string) => Promise<{ success: boolean; message: string }>
+    onChatCreated?: (callback: (data: { chat: any }) => void) => () => void
+    onChatUpdated?: (callback: (data: { chatId: string; chat: any }) => void) => () => void
+    onSelectChat?: (callback: (chatId: string) => void) => () => void
+    onTaskTriggered?: (callback: (data: any) => void) => () => void
+    onTaskCompleted?: (callback: (data: any) => void) => () => void
   }
   dialog: {
     selectDirectory: (defaultPath?: string) => Promise<string | null>
@@ -209,6 +234,7 @@ export interface WindowApi {
     move: (sourcePath: string, targetDirPath: string) => Promise<{ success: boolean; destPath?: string; error?: string }>
     delete: (targetPath: string) => Promise<{ success: boolean; error?: string }>
     reveal: (targetPath: string) => Promise<boolean>
+    readFile: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
   }
   terminal: {
     run: (params: { runId: string; command: string; cwd?: string; sessionId?: string }) => void
@@ -222,12 +248,51 @@ export interface WindowApi {
     onAiData: (callback: (data: { runId: string; text: string }) => void) => () => void
     onAiExit: (callback: (data: { runId: string; code?: number | null }) => void) => () => void
   }
+  browser?: {
+    onAction: (callback: (request: any) => void) => () => void
+    sendResponse: (response: { requestId: string; success: boolean; data?: any; error?: string }) => void
+    openView: (tab?: string) => void
+    onOpenView: (callback: (data?: any) => void) => () => void
+  }
+  telegram?: {
+    getConfig: () => Promise<TelegramConfig>
+    saveConfig: (patch: Partial<TelegramConfig>) => Promise<TelegramConfig>
+    start: () => Promise<TelegramBotStatus>
+    stop: () => Promise<void>
+    getStatus: () => Promise<TelegramBotStatus>
+    testToken: (token: string) => Promise<{
+      valid: boolean
+      botInfo?: { id: number; username: string; firstName: string }
+      error?: string
+    }>
+    onStatus: (callback: (status: TelegramBotStatus) => void) => () => void
+    notifyActiveChat?: (chatId: string | null) => void
+    getModels?: () => Promise<Array<{ id: string; name: string }>>
+    setModel?: (model: string) => Promise<string>
+  }
   setZoomFactor: (factor: number) => void
 }
 
 declare global {
   interface Window {
     api: WindowApi
+  }
+
+  namespace JSX {
+    interface IntrinsicElements {
+      webview: React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
+        src?: string
+        allowpopups?: string | boolean
+        webpreferences?: string
+        partition?: string
+        useragent?: string
+        autosize?: string | boolean
+        nodeintegration?: string | boolean
+        plugins?: string | boolean
+        preload?: string
+        httpreferrer?: string
+      }
+    }
   }
 }
 

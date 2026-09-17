@@ -1,0 +1,230 @@
+.codex-transfer-modal {
+  max-width: 640px;
+}
+
+.codex-transfer-title-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  flex-shrink: 0;
+  color: #f4f4f5;
+}
+
+.codex-transfer-modal .skill-modal-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.codex-transfer-subtitle {
+  margin: 3px 0 0 0;
+  font-size: 12px;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.5));
+  line-height: 1.4;
+}
+
+.codex-transfer-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  max-height: 58vh;
+}
+
+.codex-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 16px;
+  text-align: center;
+  color: var(--text-muted, rgba(255, 255, 255, 0.4));
+  gap: 12px;
+}
+
+.codex-empty-icon {
+  color: #a78bfa;
+  opacity: 0.6;
+}
+
+.codex-selection-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+}
+
+.codex-select-all-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, #ededed);
+  cursor: pointer;
+  user-select: none;
+}
+
+.codex-select-all-label input[type="checkbox"] {
+  accent-color: var(--accent-primary, #6366f1);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.codex-skills-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.codex-skill-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--bg-card, #222);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.07));
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.codex-skill-item:hover {
+  border-color: rgba(167, 139, 250, 0.35);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.codex-skill-item.selected {
+  border-color: rgba(167, 139, 250, 0.5);
+  background: rgba(167, 139, 250, 0.08);
+}
+
+.codex-skill-item input[type="checkbox"] {
+  margin-top: 3px;
+  accent-color: #a78bfa;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.codex-skill-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.codex-skill-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.codex-skill-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+}
+
+.codex-skill-item-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary, #aaa);
+}
+
+.codex-skill-item-badge.folder {
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+}
+
+.codex-skill-item-desc {
+  margin: 3px 0 0 0;
+  font-size: 12px;
+  color: var(--text-muted, rgba(255, 255, 255, 0.5));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.codex-transfer-options-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg-surface-elevated, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+  border-radius: 12px;
+}
+
+.codex-option-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.codex-option-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+}
+
+.codex-option-select {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-input, #161616);
+  border: 1px solid var(--border-input, rgba(255, 255, 255, 0.12));
+  color: var(--text-primary, #fff);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+}
+
+.codex-option-select:focus {
+  border-color: #a78bfa;
+}
+
+.codex-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.codex-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.75));
+  cursor: pointer;
+}
+
+.codex-radio-label input[type="radio"] {
+  accent-color: #ffffff;
+}
+
+.codex-submit-btn {
+  background: #ffffff !important;
+  border: none !important;
+  color: #000000 !important;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.codex-submit-btn:hover:not(:disabled) {
+  background: #e4e4e7 !important;
+}

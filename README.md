@@ -23,11 +23,11 @@
   </p>
 
   <p>
-    <a href="https://github.com/AmnesiaCode888/Zipply/releases/download/v0.4.0-beta/Zipply-0.4.0-win-x64.exe">
+    <a href="https://github.com/AmnesiaCode888/Zipply/releases/download/v0.5.0-beta/Zipply-0.5.0-win-x64.exe">
       <img src="https://img.shields.io/badge/Download_for_Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Download Windows" />
     </a>
     &nbsp;
-    <a href="https://github.com/AmnesiaCode888/Zipply/releases/download/v0.4.0-beta/Zipply-0.4.0-linux-x86_64.AppImage">
+    <a href="https://github.com/AmnesiaCode888/Zipply/releases/download/v0.5.0-beta/Zipply-0.5.0-linux-x86_64.AppImage">
       <img src="https://img.shields.io/badge/Download_for_Linux-1E293B?style=for-the-badge&logo=linux&logoColor=white" alt="Download Linux" />
     </a>
   </p>
@@ -91,10 +91,27 @@ Direct connection to state-of-the-art model APIs without mandatory subscriptions
 * 1-click import compatible with Cursor, Claude Desktop, and Antigravity configs.
 * In-app server status management, environment variable controls, and tool authorization.
 
+### Telegram Remote Control Bot
+* Fully autonomous remote assistant control via official Telegram Bot API.
+* Real-time streaming updates, tool execution step visualization, and desktop task completion alerts.
+* Interactive model selection, switching, and parameter customization right inside Telegram.
+* Strict user whitelist authorization for bulletproof remote security.
+
+### Embedded Browser Automation
+* Integrated interactive `<webview>` browser in the side panel with automated CORS/CSP header bypass.
+* Agent actions: navigation, clicks, typing, scrolling, JavaScript execution, and DOM extraction.
+* Live step-by-step visual inspection with screenshot capture and progress feedback.
+
 ### Dynamic Skills Framework
-* Markdown-based skills with frontmatter triggers and auto-enforcement directives.
-* Semantic vector embeddings for automatic context-based skill retrieval.
-* Integrated in-app Skill Editor with live preview and validation.
+* 23 pre-seeded production engineering and cognitive skills with YAML frontmatter triggers.
+* Turn-1 Auto-Enforcement Gate: strict execution of domain skills before writing code.
+* Semantic vector embeddings for automatic context-based skill retrieval and ontology grouping.
+* In-app Skill Editor with live preview, import/export, and Codex transfer modals.
+
+### Multi-Chat Streaming & Session Isolation
+* Concurrent generation across multiple chat sessions without cross-stream token bleeding.
+* Independent abort controllers for individual chat cancellation.
+* Unified activity timeline with real-time code diff preview and file tree navigation.
 
 ### Long-Term Memory & Blackboard
 * Subject-based conflict invalidation: new architectural decisions automatically supersede outdated assumptions.
@@ -107,17 +124,18 @@ Direct connection to state-of-the-art model APIs without mandatory subscriptions
 
 ---
 
-## <img src="resources/icons/blue/download.svg" width="22" height="22" /> Pre-built Downloads (v0.4.0-beta)
+## <img src="resources/icons/blue/download.svg" width="22" height="22" /> Pre-built Downloads (v0.5.0-beta)
 
 | Platform | Format | Architecture | Direct Download |
 | :--- | :--- | :--- | :--- |
-| **Windows** | NSIS Installer (`.exe`) | x64 | [`Zipply-0.4.0-win-x64.exe`](https://github.com/AmnesiaCode888/Zipply/releases/download/v0.4.0-beta/Zipply-0.4.0-win-x64.exe) |
-| **Linux (Portable)** | AppImage | x86_64 | [`Zipply-0.4.0-linux-x86_64.AppImage`](https://github.com/AmnesiaCode888/Zipply/releases/download/v0.4.0-beta/Zipply-0.4.0-linux-x86_64.AppImage) |
-| **Debian / Ubuntu** | Package (`.deb`) | amd64 | [`zipply-0.4.0-linux-amd64.deb`](https://github.com/AmnesiaCode888/Zipply/releases/download/v0.4.0-beta/zipply-0.4.0-linux-amd64.deb) |
-| **Void Linux** | Package (`.xbps`) | x86_64 | [`zipply-0.4.0_1.x86_64.xbps`](https://github.com/AmnesiaCode888/Zipply/releases/download/v0.4.0-beta/zipply-0.4.0_1.x86_64.xbps) |
+| **Windows** | NSIS Installer (`.exe`) | x64 | [`Zipply-0.5.0-win-x64.exe`](https://github.com/AmnesiaCode888/Zipply/releases/download/v0.5.0-beta/Zipply-0.5.0-win-x64.exe) |
+| **Linux (Portable)** | AppImage | x86_64 | [`Zipply-0.5.0-linux-x86_64.AppImage`](https://github.com/AmnesiaCode888/Zipply/releases/download/v0.5.0-beta/Zipply-0.5.0-linux-x86_64.AppImage) |
+| **Debian / Ubuntu** | Package (`.deb`) | amd64 | [`zipply-0.5.0-linux-amd64.deb`](https://github.com/AmnesiaCode888/Zipply/releases/download/v0.5.0-beta/zipply-0.5.0-linux-amd64.deb) |
+| **Void Linux** | Package (`.xbps`) | x86_64 | [`zipply-0.5.0_1.x86_64.xbps`](https://github.com/AmnesiaCode888/Zipply/releases/download/v0.5.0-beta/zipply-0.5.0_1.x86_64.xbps) |
+| **Arch Linux** | Package (`.pkg.tar.zst`) | x86_64 | [`zipply-0.5.0-1-x86_64.pkg.tar.zst`](https://github.com/AmnesiaCode888/Zipply/releases/download/v0.5.0-beta/zipply-0.5.0-1-x86_64.pkg.tar.zst) |
 
 > [!TIP]
-> All build artifacts, SHA256 checksums, and release notes are available on the [GitHub Releases](https://github.com/AmnesiaCode888/Zipply/releases) page.
+> All build artifacts, SHA256 checksums, AUR PKGBUILD, and release notes are available on the [GitHub Releases](https://github.com/AmnesiaCode888/Zipply/releases) page.
 
 ---
 
@@ -146,6 +164,7 @@ npm run build:win       # Windows NSIS (.exe)
 npm run build:appimage  # Linux AppImage
 npm run build:deb       # Debian / Ubuntu (.deb)
 npm run build:xbps      # Void Linux (.xbps)
+npm run build:pacman    # Arch Linux (.pkg.tar.zst)
 npm run build:all       # All release targets
 ```
 

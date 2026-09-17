@@ -23,7 +23,8 @@ import {
   RefreshCw,
   Search,
   CheckCircle2,
-  KeyRound
+  KeyRound,
+  Sliders
 } from 'lucide-react'
 import { useAiSettingsContext, PROVIDER_PRESETS } from '../../hooks/AiSettingsContext'
 import { AiProviderPreset, ConnectedProvider, DiscoveredLocalService } from '../../types/settings'
@@ -58,9 +59,14 @@ export const ModelsSettings: React.FC = () => {
   const [formApiKey, setFormApiKey] = useState('')
   const [formModel, setFormModel] = useState('')
   const [formFastModel, setFormFastModel] = useState('')
+  const [enableEmbedding, setEnableEmbedding] = useState<boolean>(false)
   const [formEmbeddingModel, setFormEmbeddingModel] = useState('')
   const [formEmbeddingBaseUrl, setFormEmbeddingBaseUrl] = useState('')
   const [showEmbeddingAdvanced, setShowEmbeddingAdvanced] = useState(false)
+  const [formContextLength, setFormContextLength] = useState<number>(32768)
+  const [formTemperature, setFormTemperature] = useState<number>(0.7)
+  const [formMaxTokens, setFormMaxTokens] = useState<number>(4096)
+  const [showInferenceAdvanced, setShowInferenceAdvanced] = useState<boolean>(false)
   const [showKey, setShowKey] = useState(false)
   const [showTavilyKey, setShowTavilyKey] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -113,6 +119,9 @@ export const ModelsSettings: React.FC = () => {
       case 'lmstudio':
       case 'vllm':
         return <HardDrive size={17} />
+      case 'custom_provider':
+        return <Globe size={17} />
+      case 'custom':
       default:
         return <Server size={17} />
     }
@@ -127,9 +136,14 @@ export const ModelsSettings: React.FC = () => {
     setFormApiKey('')
     setFormModel('')
     setFormFastModel('')
+    setEnableEmbedding(false)
     setFormEmbeddingModel(preset.defaultEmbeddingModel || '')
     setFormEmbeddingBaseUrl('')
     setShowEmbeddingAdvanced(false)
+    setFormContextLength(preset.defaultContextLength || 32768)
+    setFormTemperature(preset.defaultTemperature ?? 0.7)
+    setFormMaxTokens(preset.defaultMaxTokens || 4096)
+    setShowInferenceAdvanced(false)
     setFetchedModels([])
     setFormError(null)
     setModelSearchQuery('')
@@ -144,9 +158,15 @@ export const ModelsSettings: React.FC = () => {
     setFormApiKey(prov.apiKey)
     setFormModel(prov.model || '')
     setFormFastModel(prov.fastModel || '')
+    setEnableEmbedding(Boolean(prov.embeddingModel))
     setFormEmbeddingModel(prov.embeddingModel || '')
     setFormEmbeddingBaseUrl(prov.embeddingBaseUrl || '')
     setShowEmbeddingAdvanced(Boolean(prov.embeddingBaseUrl))
+    const preset = PROVIDER_PRESETS.find((p) => p.id === prov.providerId)
+    setFormContextLength(prov.contextLength || preset?.defaultContextLength || 32768)
+    setFormTemperature(prov.temperature !== undefined ? prov.temperature : (preset?.defaultTemperature ?? 0.7))
+    setFormMaxTokens(prov.maxTokens || preset?.defaultMaxTokens || 4096)
+    setShowInferenceAdvanced(false)
     setFetchedModels(prov.models || [])
     setFormError(null)
     setModelSearchQuery('')
@@ -169,6 +189,10 @@ export const ModelsSettings: React.FC = () => {
     setFormEmbeddingModel(preset.defaultEmbeddingModel || '')
     setFormEmbeddingBaseUrl('')
     setShowEmbeddingAdvanced(false)
+    if (preset.defaultContextLength) setFormContextLength(preset.defaultContextLength)
+    if (preset.defaultTemperature !== undefined) setFormTemperature(preset.defaultTemperature)
+    if (preset.defaultMaxTokens) setFormMaxTokens(preset.defaultMaxTokens)
+    setShowInferenceAdvanced(false)
     setFetchedModels(discovered?.models || [])
     setFormError(null)
     setModelSearchQuery('')
@@ -196,8 +220,8 @@ export const ModelsSettings: React.FC = () => {
           const nonEmbedding = models.filter((m) => !/embed|bge|nomic|ada/i.test(m))
           setFormModel(nonEmbedding.length > 0 ? nonEmbedding[0] : models[0])
         }
-        // If no embedding model chosen yet and router provides one, auto-select it
-        if (!formEmbeddingModel) {
+        // Only auto-select embedding model if user has enabled embeddings
+        if (enableEmbedding && !formEmbeddingModel) {
           const embCandidate = models.find((m) => /embed|bge|nomic|ada/i.test(m))
           if (embCandidate) setFormEmbeddingModel(embCandidate)
         }
@@ -229,31 +253,39 @@ export const ModelsSettings: React.FC = () => {
       return
     }
 
-    const resolvedFastModel = formFastModel.trim() || formModel.trim()
+    const resolvedFastModel = formFastModel.trim() || undefined
+    const resolvedEmbeddingModel = enableEmbedding && formEmbeddingModel.trim() ? formEmbeddingModel.trim() : undefined
+    const resolvedEmbeddingBaseUrl = enableEmbedding && formEmbeddingBaseUrl.trim() ? formEmbeddingBaseUrl.trim() : undefined
 
     if (editingId) {
       updateConnectedProvider(editingId, {
         providerId: formPreset,
-        name: formName || currentPreset.name,
+        name: formName.trim() || currentPreset.name,
         baseUrl: formBaseUrl.trim(),
         apiKey: formApiKey.trim(),
         model: formModel.trim(),
         fastModel: resolvedFastModel,
-        embeddingModel: formEmbeddingModel.trim() || undefined,
-        embeddingBaseUrl: formEmbeddingBaseUrl.trim() || undefined,
+        contextLength: formContextLength || 32768,
+        temperature: formTemperature,
+        maxTokens: formMaxTokens || 4096,
+        embeddingModel: resolvedEmbeddingModel,
+        embeddingBaseUrl: resolvedEmbeddingBaseUrl,
         models: fetchedModels.length > 0 ? fetchedModels : [formModel.trim()],
         requiresKey: currentPreset.requiresKey
       })
     } else {
       addConnectedProvider({
         providerId: formPreset,
-        name: formName || currentPreset.name,
+        name: formName.trim() || currentPreset.name,
         baseUrl: formBaseUrl.trim(),
         apiKey: formApiKey.trim(),
         model: formModel.trim(),
         fastModel: resolvedFastModel,
-        embeddingModel: formEmbeddingModel.trim() || undefined,
-        embeddingBaseUrl: formEmbeddingBaseUrl.trim() || undefined,
+        contextLength: formContextLength || 32768,
+        temperature: formTemperature,
+        maxTokens: formMaxTokens || 4096,
+        embeddingModel: resolvedEmbeddingModel,
+        embeddingBaseUrl: resolvedEmbeddingBaseUrl,
         models: fetchedModels.length > 0 ? fetchedModels : [formModel.trim()],
         requiresKey: currentPreset.requiresKey
       })
@@ -279,7 +311,8 @@ export const ModelsSettings: React.FC = () => {
   // ════════════════════════════════════════════════════════════════════════
   if (screen === 'connect') {
     const currentPreset = PROVIDER_PRESETS.find((p) => p.id === formPreset) || PROVIDER_PRESETS[0]
-    const isKeyReady = !currentPreset.requiresKey || formApiKey.trim().length > 0
+    const isCustomCategory = currentPreset.category === 'custom'
+    const isKeyReady = !currentPreset.requiresKey || isCustomCategory || formApiKey.trim().length > 0
 
     return (
       <div className="models-settings-root">
@@ -298,10 +331,10 @@ export const ModelsSettings: React.FC = () => {
         {/* Hero Header */}
         <div className="models-hero-header">
           <h1 className="models-title-text">
-            {editingId ? `Настройка ${formName}` : 'Подключение провайдера'}
+            {editingId ? `Настройка: ${formName}` : 'Подключение провайдера'}
           </h1>
           <p className="models-desc-text">
-            Выберите сервис, укажите ключ и выберите модель из списка
+            Выберите сервис, настройте адрес сервера и выберите модель для работы
           </p>
         </div>
 
@@ -342,7 +375,7 @@ export const ModelsSettings: React.FC = () => {
                     </option>
                   ))}
                 </optgroup>
-                <optgroup label="Свой сервер">
+                <optgroup label="Свой сервер / Провайдер">
                   {PROVIDER_PRESETS.filter((p) => p.category === 'custom').map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
@@ -356,8 +389,64 @@ export const ModelsSettings: React.FC = () => {
             </div>
           </div>
 
-          {/* 2. API Key (Only if required) */}
-          {currentPreset.requiresKey ? (
+          {/* 1.5 Connection Name (Editable title for custom or any provider) */}
+          <div className="models-input-block">
+            <div className="input-label-row">
+              <label htmlFor="form-name" className="input-label-title">
+                Название подключения
+              </label>
+              <span className="input-subtle-hint">Отображается в списке сервисов</span>
+            </div>
+            <div className="input-field-container">
+              <input
+                id="form-name"
+                type="text"
+                className="input-field-control"
+                placeholder={currentPreset.name}
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                spellCheck={false}
+              />
+            </div>
+          </div>
+
+          {/* 2. API Key */}
+          {isCustomCategory ? (
+            <div className="models-input-block">
+              <div className="input-label-row">
+                <label htmlFor="form-key" className="input-label-title">
+                  API Key
+                </label>
+                <span className="input-secure-pill optional">
+                  <ShieldCheck size={12} />
+                  <span>Опционально (если требуется)</span>
+                </span>
+              </div>
+
+              <div className="input-field-container">
+                <input
+                  id="form-key"
+                  type={showKey ? 'text' : 'password'}
+                  className="input-field-control"
+                  placeholder="sk-... (оставьте пустым, если сервер без авторизации)"
+                  value={formApiKey}
+                  onChange={(e) => {
+                    setFormApiKey(e.target.value)
+                    setFormError(null)
+                  }}
+                  spellCheck={false}
+                />
+                <button
+                  type="button"
+                  className="input-eye-toggle"
+                  onClick={() => setShowKey(!showKey)}
+                  title={showKey ? 'Скрыть ключ' : 'Показать ключ'}
+                >
+                  {showKey ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
+          ) : currentPreset.requiresKey ? (
             <div className="models-input-block">
               <div className="input-label-row">
                 <label htmlFor="form-key" className="input-label-title">
@@ -522,14 +611,20 @@ export const ModelsSettings: React.FC = () => {
                               {isEmbeddingCandidate && (
                                 <button
                                   type="button"
-                                  className={`model-set-vector-btn ${isVectorSelected ? 'active' : ''}`}
+                                  className={`model-set-vector-btn ${isVectorSelected && enableEmbedding ? 'active' : ''}`}
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    setFormEmbeddingModel(m)
+                                    if (isVectorSelected && enableEmbedding) {
+                                      setFormEmbeddingModel('')
+                                      setEnableEmbedding(false)
+                                    } else {
+                                      setFormEmbeddingModel(m)
+                                      setEnableEmbedding(true)
+                                    }
                                   }}
-                                  title="Выбрать как модель векторного поиска"
+                                  title={isVectorSelected && enableEmbedding ? 'Отключить векторную модель' : 'Выбрать как модель векторного поиска'}
                                 >
-                                  {isVectorSelected ? 'Векторная ✓' : '+ Вектор'}
+                                  {isVectorSelected && enableEmbedding ? 'Векторная ✓' : '+ Вектор'}
                                 </button>
                               )}
                               {isSelected ? (
@@ -558,123 +653,372 @@ export const ModelsSettings: React.FC = () => {
           {/* 4.5. Fast Model (Watchdog, Summaries, Titles) */}
           <div className="models-input-block">
             <div className="input-label-row">
-              <div className="input-label-with-badge">
-                <label htmlFor="form-fast-model" className="input-label-title">
-                  Быстрая модель (Fast Model)
-                </label>
-                <span className="vector-model-pill">Сторож и фоновые задачи</span>
-              </div>
-            </div>
-
-            {/* Quick Preset Chips for Fast Models */}
-            <div className="embedding-preset-chips-row">
-              <span className="embedding-chips-title">Быстрый выбор:</span>
-              {[
-                'deepseek/deepseek-v4-flash-0731',
-                'inception/mercury-2.5-preview'
-              ].map((fastPreset) => (
-                <button
-                  key={fastPreset}
-                  type="button"
-                  className={`embedding-chip-btn ${formFastModel === fastPreset ? 'active' : ''}`}
-                  onClick={() => setFormFastModel(fastPreset)}
-                >
-                  <span>{fastPreset}</span>
-                  {formFastModel === fastPreset && <Check size={11} />}
-                </button>
-              ))}
+              <label htmlFor="form-fast-model" className="input-label-title">
+                Быстрая модель (Fast Model)
+              </label>
               {formFastModel && (
                 <button
                   type="button"
-                  className="embedding-chip-btn"
+                  className="input-subtle-action"
                   onClick={() => setFormFastModel('')}
                   title="Использовать основную модель"
                 >
-                  <span>Основная ({formModel || 'по умолчанию'})</span>
+                  Сбросить на основную
                 </button>
               )}
             </div>
+
+            {/* Quick Preset Chips for Fast Models - only shown when real fast models exist */}
+            {(() => {
+              const fastCandidates = fetchedModels
+                .filter((m) => /flash|mini|haiku|turbo|small|8b|7b|3b|1b/i.test(m) && !/embed|bge|nomic|ada/i.test(m) && m !== formModel)
+                .slice(0, 5)
+
+              if (fastCandidates.length === 0) return null
+
+              return (
+                <div className="embedding-preset-chips-row">
+                  <span className="embedding-chips-title">Из роутера:</span>
+                  {fastCandidates.map((fastPreset) => (
+                    <button
+                      key={fastPreset}
+                      type="button"
+                      className={`embedding-chip-btn ${formFastModel === fastPreset ? 'active' : ''}`}
+                      onClick={() => setFormFastModel(formFastModel === fastPreset ? '' : fastPreset)}
+                    >
+                      <span>{fastPreset}</span>
+                      {formFastModel === fastPreset && <Check size={11} />}
+                    </button>
+                  ))}
+                </div>
+              )
+            })()}
 
             <div className="input-field-container">
               <input
                 id="form-fast-model"
                 type="text"
                 className="input-field-control"
-                placeholder={formModel ? `По умолчанию: ${formModel}` : 'Например: deepseek/deepseek-v4-flash-0731 или inception/mercury-2.5-preview'}
+                placeholder={formModel ? `По умолчанию: ${formModel}` : 'Оставьте пустым для использования основной модели'}
                 value={formFastModel}
                 onChange={(e) => setFormFastModel(e.target.value)}
                 spellCheck={false}
               />
             </div>
             <p className="field-hint-caption" style={{ marginTop: '6px', fontSize: '11px', color: 'rgba(255, 255, 255, 0.45)' }}>
-              Используется для Watchdog, генерации заголовков и резюме сессий. Можно ввести любую модель или выбрать из рекомендаций. Если не указана, используется основная.
+              Используется для фоновых проверок, сторожа и резюме. Если не указана — совпадает с основной.
             </p>
           </div>
 
           {/* 5. Embedding / Vector Model Selection */}
           <div className="models-input-block">
             <div className="input-label-row">
-              <div className="input-label-with-badge">
-                <label htmlFor="form-embedding-model" className="input-label-title">
-                  Модель вектора (Embeddings)
-                </label>
-                <span className="vector-model-pill">Векторный поиск по навыкам</span>
-              </div>
-            </div>
-
-            {/* Quick Preset Chips */}
-            {currentPreset.recommendedEmbeddingModels && currentPreset.recommendedEmbeddingModels.length > 0 && (
-              <div className="embedding-preset-chips-row">
-                <span className="embedding-chips-title">Рекомендации:</span>
-                {currentPreset.recommendedEmbeddingModels.map((embModel) => (
-                  <button
-                    key={embModel}
-                    type="button"
-                    className={`embedding-chip-btn ${formEmbeddingModel === embModel ? 'active' : ''}`}
-                    onClick={() => setFormEmbeddingModel(embModel)}
-                  >
-                    <span>{embModel}</span>
-                    {formEmbeddingModel === embModel && <Check size={11} />}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Embedding Model Input */}
-            <div className="input-field-container">
-              <input
-                id="form-embedding-model"
-                type="text"
-                className="input-field-control"
-                placeholder={currentPreset.defaultEmbeddingModel || 'Например: text-embedding-3-small или nomic-embed-text'}
-                value={formEmbeddingModel}
-                onChange={(e) => setFormEmbeddingModel(e.target.value)}
-                spellCheck={false}
-              />
-            </div>
-
-            {/* Optional Custom Base URL for embeddings */}
-            <div className="embedding-custom-endpoint-wrap">
-              <button
-                type="button"
-                className="embedding-advanced-toggle-btn"
-                onClick={() => setShowEmbeddingAdvanced(!showEmbeddingAdvanced)}
-              >
-                <span>{showEmbeddingAdvanced ? '− Скрыть отдельный Base URL эмбеддингов' : '+ Указать отдельный Base URL для эмбеддингов'}</span>
-              </button>
-              {showEmbeddingAdvanced && (
-                <div className="input-field-container sub-input">
+              <label className="input-label-title" htmlFor="form-embedding-model">
+                Модель вектора (Embeddings)
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '11px', color: enableEmbedding ? '#10b981' : 'rgba(255, 255, 255, 0.4)' }}>
+                  {enableEmbedding ? 'Включена' : 'Выключена'}
+                </span>
+                <label className="smooth-toggle-switch" title={enableEmbedding ? 'Выключить векторную модель' : 'Включить векторную модель'}>
                   <input
+                    type="checkbox"
+                    checked={enableEmbedding}
+                    onChange={(e) => {
+                      const next = e.target.checked
+                      setEnableEmbedding(next)
+                      if (next && !formEmbeddingModel) {
+                        const embCandidate = fetchedModels.find((m) => /embed|bge|nomic|ada/i.test(m))
+                        setFormEmbeddingModel(embCandidate || currentPreset.defaultEmbeddingModel || 'text-embedding-3-small')
+                      }
+                    }}
+                  />
+                  <span className="toggle-thumb"></span>
+                </label>
+              </div>
+            </div>
+
+            {!enableEmbedding ? (
+              <p className="field-hint-caption" style={{ margin: '4px 0 0 0', fontSize: '11px', color: 'rgba(255, 255, 255, 0.45)' }}>
+                Отключено — поиск по навыкам и памяти работает через быстрый лексический поиск без запросов к эмбеддингам.
+              </p>
+            ) : (
+              <>
+                {/* Quick Preset Chips from router or preset */}
+                {(() => {
+                  const routerEmbCandidates = fetchedModels.filter((m) => /embed|bge|nomic|ada/i.test(m))
+                  const listToShow = routerEmbCandidates.length > 0
+                    ? routerEmbCandidates.slice(0, 4)
+                    : (currentPreset.recommendedEmbeddingModels || [])
+                  if (listToShow.length === 0) return null
+
+                  return (
+                    <div className="embedding-preset-chips-row">
+                      <span className="embedding-chips-title">{routerEmbCandidates.length > 0 ? 'Из роутера:' : 'Рекомендации:'}</span>
+                      {listToShow.map((embModel) => (
+                        <button
+                          key={embModel}
+                          type="button"
+                          className={`embedding-chip-btn ${formEmbeddingModel === embModel ? 'active' : ''}`}
+                          onClick={() => setFormEmbeddingModel(formEmbeddingModel === embModel ? '' : embModel)}
+                        >
+                          <span>{embModel}</span>
+                          {formEmbeddingModel === embModel && <Check size={11} />}
+                        </button>
+                      ))}
+                      {formEmbeddingModel && (
+                        <button
+                          type="button"
+                          className="embedding-chip-btn clear-chip"
+                          onClick={() => setFormEmbeddingModel('')}
+                          title="Очистить"
+                        >
+                          <span>✕ Очистить</span>
+                        </button>
+                      )}
+                    </div>
+                  )
+                })()}
+
+                {/* Embedding Model Input */}
+                <div className="input-field-container">
+                  <input
+                    id="form-embedding-model"
                     type="text"
                     className="input-field-control"
-                    placeholder="https://api.openai.com/v1 (если отличается от основного Base URL)"
-                    value={formEmbeddingBaseUrl}
-                    onChange={(e) => setFormEmbeddingBaseUrl(e.target.value)}
+                    placeholder={currentPreset.defaultEmbeddingModel || 'text-embedding-3-small / nomic-embed-text / bge-m3'}
+                    value={formEmbeddingModel}
+                    onChange={(e) => setFormEmbeddingModel(e.target.value)}
                     spellCheck={false}
                   />
                 </div>
-              )}
+
+                {/* Optional Custom Base URL for embeddings */}
+                <div className="embedding-custom-endpoint-wrap">
+                  <button
+                    type="button"
+                    className="embedding-advanced-toggle-btn"
+                    onClick={() => setShowEmbeddingAdvanced(!showEmbeddingAdvanced)}
+                  >
+                    <span>{showEmbeddingAdvanced ? '− Скрыть отдельный Base URL эмбеддингов' : '+ Указать отдельный Base URL для эмбеддингов'}</span>
+                  </button>
+                  {showEmbeddingAdvanced && (
+                    <div className="input-field-container sub-input">
+                      <input
+                        type="text"
+                        className="input-field-control"
+                        placeholder="https://api.openai.com/v1 (если отличается от основного Base URL)"
+                        value={formEmbeddingBaseUrl}
+                        onChange={(e) => setFormEmbeddingBaseUrl(e.target.value)}
+                        spellCheck={false}
+                      />
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* 6. Inference Parameters (Context Window, Temperature, Max Tokens) */}
+          <div className="models-input-block inference-block">
+            <div className="input-label-row">
+              <label className="input-label-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Sliders size={13} style={{ color: '#38bdf8' }} />
+                <span>Параметры инференса</span>
+              </label>
+              <button
+                type="button"
+                className="embedding-advanced-toggle-btn"
+                style={{ padding: 0, margin: 0 }}
+                onClick={() => setShowInferenceAdvanced(!showInferenceAdvanced)}
+              >
+                <span>{showInferenceAdvanced ? '− Скрыть параметры' : '+ Настроить параметры'}</span>
+              </button>
             </div>
+
+            {showInferenceAdvanced && (
+              <div className="inference-controls-surface">
+                {/* 6.1 Context Window */}
+                <div className="inference-field-card">
+                  <div className="inference-field-header">
+                    <span className="inference-field-label">
+                      Размер контекста (Context Length / num_ctx)
+                    </span>
+                    <span className="inference-value-badge ctx-badge">
+                      {formContextLength ? `${Math.round(formContextLength / 1024)}K (${formContextLength.toLocaleString()} токенов)` : 'По умолчанию'}
+                    </span>
+                  </div>
+
+                  {/* Preset chips */}
+                  <div className="embedding-preset-chips-row">
+                    {[
+                      { label: '8K', value: 8192 },
+                      { label: '16K', value: 16384 },
+                      { label: '32K (реком.)', value: 32768 },
+                      { label: '64K', value: 65536 },
+                      { label: '128K', value: 131072 }
+                    ].map((chip) => (
+                      <button
+                        key={chip.value}
+                        type="button"
+                        className={`embedding-chip-btn ${formContextLength === chip.value ? 'active' : ''}`}
+                        onClick={() => setFormContextLength(chip.value)}
+                      >
+                        <span>{chip.label}</span>
+                        {formContextLength === chip.value && <Check size={11} />}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="input-field-container">
+                    <input
+                      type="number"
+                      min={1024}
+                      max={524288}
+                      step={1024}
+                      className="input-field-control"
+                      placeholder="32768"
+                      value={formContextLength === 0 ? '' : formContextLength}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        if (val === '') {
+                          setFormContextLength(0)
+                        } else {
+                          const num = parseInt(val, 10)
+                          if (!isNaN(num)) setFormContextLength(num)
+                        }
+                      }}
+                      onBlur={() => {
+                        if (!formContextLength || formContextLength < 1024) {
+                          setFormContextLength(32768)
+                        }
+                      }}
+                    />
+                  </div>
+                  <p className="field-hint-caption" style={{ marginTop: '5px', fontSize: '11px', color: 'rgba(255, 255, 255, 0.45)' }}>
+                    Для Ollama, LM Studio, vLLM и локальных/кастомных серверов определяет объем памяти под системный промпт и диалог.
+                  </p>
+                </div>
+
+                {/* 6.2 Temperature & Max Tokens row */}
+                <div className="inference-dual-row">
+                  {/* Temperature Card */}
+                  <div className="inference-field-card">
+                    <div className="inference-field-header">
+                      <span className="inference-field-label">Температура</span>
+                      <div className="temperature-input-wrap">
+                        <input
+                          type="number"
+                          min={0}
+                          max={2}
+                          step={0.05}
+                          className="temperature-number-input"
+                          value={formTemperature}
+                          onChange={(e) => {
+                            const v = parseFloat(e.target.value)
+                            if (!isNaN(v)) setFormTemperature(Math.max(0, Math.min(2.0, v)))
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Temperature Preset Chips */}
+                    <div className="embedding-preset-chips-row">
+                      {[
+                        { label: '0.2 Код', value: 0.2 },
+                        { label: '0.7 Баланс', value: 0.7 },
+                        { label: '1.0 Творчество', value: 1.0 }
+                      ].map((chip) => (
+                        <button
+                          key={chip.value}
+                          type="button"
+                          className={`embedding-chip-btn ${Math.abs(formTemperature - chip.value) < 0.01 ? 'active' : ''}`}
+                          onClick={() => setFormTemperature(chip.value)}
+                        >
+                          <span>{chip.label}</span>
+                          {Math.abs(formTemperature - chip.value) < 0.01 && <Check size={11} />}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="range-slider-container">
+                      <input
+                        type="range"
+                        min="0"
+                        max="2.0"
+                        step="0.05"
+                        className="temperature-slider-control"
+                        value={formTemperature}
+                        onChange={(e) => setFormTemperature(parseFloat(e.target.value))}
+                      />
+                    </div>
+                    <p className="field-hint-caption" style={{ marginTop: '2px', fontSize: '11px', color: 'rgba(255, 255, 255, 0.45)' }}>
+                      0.0–0.2 точный код и инструменты, 0.7 оптимальный баланс, 1.0+ генерация идей.
+                    </p>
+                  </div>
+
+                  {/* Max Tokens Card */}
+                  <div className="inference-field-card">
+                    <div className="inference-field-header">
+                      <span className="inference-field-label">Макс. токенов ответа</span>
+                      <span className="inference-value-badge tokens-badge">
+                        {formMaxTokens ? `${formMaxTokens.toLocaleString()} токенов` : 'По умолчанию'}
+                      </span>
+                    </div>
+
+                    {/* Max tokens Preset Chips */}
+                    <div className="embedding-preset-chips-row">
+                      {[
+                        { label: '2K', value: 2048 },
+                        { label: '4K', value: 4096 },
+                        { label: '8K', value: 8192 },
+                        { label: '16K', value: 16384 },
+                        { label: '32K', value: 32768 }
+                      ].map((chip) => (
+                        <button
+                          key={chip.value}
+                          type="button"
+                          className={`embedding-chip-btn ${formMaxTokens === chip.value ? 'active' : ''}`}
+                          onClick={() => setFormMaxTokens(chip.value)}
+                        >
+                          <span>{chip.label}</span>
+                          {formMaxTokens === chip.value && <Check size={11} />}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="input-field-container">
+                      <input
+                        type="number"
+                        min={256}
+                        max={131072}
+                        step={512}
+                        className="input-field-control"
+                        placeholder="4096"
+                        value={formMaxTokens === 0 ? '' : formMaxTokens}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          if (val === '') {
+                            setFormMaxTokens(0)
+                          } else {
+                            const num = parseInt(val, 10)
+                            if (!isNaN(num)) setFormMaxTokens(num)
+                          }
+                        }}
+                        onBlur={() => {
+                          if (!formMaxTokens || formMaxTokens < 256) {
+                            setFormMaxTokens(4096)
+                          }
+                        }}
+                      />
+                    </div>
+                    <p className="field-hint-caption" style={{ marginTop: '5px', fontSize: '11px', color: 'rgba(255, 255, 255, 0.45)' }}>
+                      Максимальное количество токенов за один ответ (max_tokens / num_predict).
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {formError && <div className="models-error-alert">{formError}</div>}
@@ -797,6 +1141,7 @@ export const ModelsSettings: React.FC = () => {
                       <span className="provider-model-subtitle">
                         {prov.model ? `Модель: ${prov.model}` : 'Модель не выбрана'}
                         {prov.fastModel && prov.fastModel !== prov.model ? ` • Fast: ${prov.fastModel}` : ''}
+                        {prov.contextLength ? ` • ${Math.round(prov.contextLength / 1024)}k ctx` : ''}
                       </span>
                     </div>
                   </div>
@@ -988,21 +1333,37 @@ export const ModelsSettings: React.FC = () => {
             </div>
             <span className="option-subline">
               {config.embeddingModel
-                ? `Активная модель: ${config.embeddingModel} (семантический поиск по навыкам и памяти активен)`
-                : 'Модель не указана — используется лексический поиск. Укажите text-embedding-3-small, nomic-embed-text или bge-m3 для включения векторного поиска.'}
+                ? `Активна: ${config.embeddingModel} (семантический поиск включен)`
+                : 'Отключено — используется быстрый лексический поиск (без запросов к роутеру).'}
             </span>
           </div>
           <div className="embedding-global-control">
-            <div className="input-field-container compact">
+            <label className="smooth-toggle-switch" title={config.embeddingModel ? 'Отключить векторный поиск' : 'Включить векторный поиск'}>
               <input
-                type="text"
-                className="input-field-control"
-                placeholder="text-embedding-3-small / nomic-embed-text"
-                value={config.embeddingModel || ''}
-                onChange={(e) => updateField('embeddingModel', e.target.value)}
-                spellCheck={false}
+                type="checkbox"
+                checked={Boolean(config.embeddingModel)}
+                onChange={(e) => {
+                  if (!e.target.checked) {
+                    updateField('embeddingModel', '')
+                  } else {
+                    updateField('embeddingModel', activeProvider?.embeddingModel || 'text-embedding-3-small')
+                  }
+                }}
               />
-            </div>
+              <span className="toggle-thumb"></span>
+            </label>
+            {Boolean(config.embeddingModel) && (
+              <div className="input-field-container compact" style={{ minWidth: '220px' }}>
+                <input
+                  type="text"
+                  className="input-field-control"
+                  placeholder="text-embedding-3-small"
+                  value={config.embeddingModel || ''}
+                  onChange={(e) => updateField('embeddingModel', e.target.value)}
+                  spellCheck={false}
+                />
+              </div>
+            )}
           </div>
         </div>
 

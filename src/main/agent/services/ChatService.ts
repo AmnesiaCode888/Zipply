@@ -10,6 +10,7 @@ export interface ChatConfig {
   fastModel?: string
   temperature?: number
   maxTokens?: number
+  contextLength?: number
   stream?: boolean
   reasoningEffort?: string
   tavilyKey?: string
@@ -319,9 +320,20 @@ export class ChatService {
     abortSignal?: AbortSignal
   ): Promise<ChatResponse> {
     let baseUrl = (config.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '')
-    if (baseUrl.includes('api.anthropic.com')) {
+    if (baseUrl.includes('anthropic.com')) {
       return this._sendAnthropicRequest(config, messages, tools, onContentChunk, onReasoningChunk, abortSignal)
     }
+
+    const isOllama =
+      baseUrl.includes('11434') ||
+      config.providerPreset === 'ollama' ||
+      config.providerId === 'ollama' ||
+      (typeof config.name === 'string' && config.name.toLowerCase().includes('ollama'))
+
+    if (isOllama) {
+      return this._sendOllamaRequest(config, messages, tools, onContentChunk, onReasoningChunk, abortSignal)
+    }
+
     const url = baseUrl.endsWith('/chat/completions') ? baseUrl : `${baseUrl}/chat/completions`
 
     const isStreaming = config.stream !== false
@@ -359,6 +371,13 @@ export class ChatService {
       // Some Gemini proxies reject max_tokens; skip for Gemini-like endpoints
       if (!isGeminiLike) {
         body.max_tokens = config.maxTokens
+      }
+    }
+
+    if (typeof config.contextLength === 'number' && config.contextLength > 0) {
+      // Pass max_context_length for local models / proxies that accept it
+      if (!isOpenAI && !isGeminiLike) {
+        body.max_context_length = config.contextLength
       }
     }
 
@@ -1004,6 +1023,216 @@ export class ChatService {
       name: tc.name,
       argumentsJson: tc.argsBuf || '{}'
     }))
+
+    return {
+      content: contentBuf,
+      reasoningContent: reasoningBuf,
+      toolCalls,
+      usage: {
+        promptTokens,
+        completionTokens,
+        totalTokens: promptTokens + completionTokens
+      }
+    }
+  }
+
+  /**
+   * Native Ollama API integration (/api/chat).
+   * Directly passes options: { num_ctx, temperature, num_predict } to dynamically allocate
+   * context window (e.g. 16k, 32k, 64k) without requiring custom Modelfiles, avoiding
+   * the common 400 exceed_context_size_error on agentic prompt evaluation.
+   */
+  private static async _sendOllamaRequest(
+    config: ChatConfig,
+    messages: OpenAiMessage[],
+    tools?: OpenAiToolDefinition[],
+    onContentChunk?: (chunk: string) => void,
+    onReasoningChunk?: (reasoningChunk: string) => void,
+    abortSignal?: AbortSignal
+  ): Promise<ChatResponse> {
+    const rawBaseUrl = (config.baseUrl || 'http://localhost:11434').replace(/\/+$/, '')
+    const url = rawBaseUrl.replace(/\/v1\/?$/, '').replace(/\/chat\/completions\/?$/, '') + '/api/chat'
+    const isStreaming = config.stream !== false
+    const cleanModel = (config.model || '').replace(/^models\//, '').trim()
+    const sanitizedMessages = this.sanitizeMessages(messages, config)
+
+    const ollamaMessages = sanitizedMessages.map((m) => {
+      let contentStr = ''
+      const images: string[] = []
+
+      if (typeof m.content === 'string') {
+        contentStr = m.content
+      } else if (Array.isArray(m.content)) {
+        for (const part of m.content) {
+          if (part && typeof part === 'object') {
+            if (part.type === 'text' && typeof part.text === 'string') {
+              contentStr += (contentStr ? '\n' : '') + part.text
+            } else if (part.type === 'image_url' && part.image_url?.url) {
+              const imgUrl = String(part.image_url.url)
+              const match = imgUrl.match(/^data:image\/[a-zA-Z]+;base64,(.+)$/)
+              images.push(match ? match[1] : imgUrl)
+            }
+          }
+        }
+      }
+
+      const msg: Record<string, unknown> = {
+        role: m.role,
+        content: contentStr
+      }
+      if (images.length > 0) {
+        msg.images = images
+      }
+      if (Array.isArray(m.tool_calls) && m.tool_calls.length > 0) {
+        msg.tool_calls = m.tool_calls
+      }
+      return msg
+    })
+
+    const numCtx =
+      typeof config.contextLength === 'number' && config.contextLength > 0
+        ? config.contextLength
+        : 32768
+    const temperature =
+      typeof config.temperature === 'number'
+        ? Math.max(0, Math.min(2.0, config.temperature))
+        : 0.7
+    const maxTokens =
+      typeof config.maxTokens === 'number' && config.maxTokens > 0 ? config.maxTokens : 4096
+
+    const body: Record<string, unknown> = {
+      model: cleanModel,
+      messages: ollamaMessages,
+      stream: isStreaming,
+      options: {
+        num_ctx: numCtx,
+        temperature,
+        num_predict: maxTokens
+      }
+    }
+
+    if (tools && tools.length > 0) {
+      body.tools = tools
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    }
+    if (config.apiKey && config.apiKey.trim()) {
+      headers['Authorization'] = `Bearer ${config.apiKey.trim()}`
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: abortSignal
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      console.error(`[ChatService] Ollama API error (${response.status}) from ${url}:`, text)
+      throw new Error(`Ollama API ${response.status}: ${text.slice(0, 300)}`)
+    }
+
+    if (!isStreaming) {
+      const json: any = await response.json()
+      const content = json?.message?.content || ''
+      const reasoning = json?.message?.thinking || ''
+      const toolCallsRaw = json?.message?.tool_calls
+      const toolCalls: ToolCallChunk[] = Array.isArray(toolCallsRaw)
+        ? toolCallsRaw.map((tc: any) => ({
+            id: tc.id || `call_${Math.random().toString(36).slice(2)}`,
+            name: tc.function?.name || '',
+            argumentsJson:
+              typeof tc.function?.arguments === 'string'
+                ? tc.function.arguments
+                : JSON.stringify(tc.function?.arguments || {})
+          }))
+        : []
+
+      if (content && onContentChunk) onContentChunk(content)
+      if (reasoning && onReasoningChunk) onReasoningChunk(reasoning)
+
+      const promptTokens = json.prompt_eval_count || 0
+      const completionTokens = json.eval_count || 0
+
+      return {
+        content,
+        reasoningContent: reasoning,
+        toolCalls,
+        usage: {
+          promptTokens,
+          completionTokens,
+          totalTokens: promptTokens + completionTokens
+        }
+      }
+    }
+
+    return this._parseOllamaStream(response, onContentChunk, onReasoningChunk)
+  }
+
+  private static async _parseOllamaStream(
+    response: Response,
+    onContentChunk?: (chunk: string) => void,
+    onReasoningChunk?: (reasoningChunk: string) => void
+  ): Promise<ChatResponse> {
+    if (!response.body) throw new Error('Response body is empty')
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let contentBuf = ''
+    let reasoningBuf = ''
+    const toolCalls: ToolCallChunk[] = []
+    let promptTokens = 0
+    let completionTokens = 0
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed) continue
+
+          try {
+            const parsed = JSON.parse(trimmed)
+            if (parsed.message?.content) {
+              contentBuf += parsed.message.content
+              onContentChunk?.(parsed.message.content)
+            }
+            if (parsed.message?.thinking) {
+              reasoningBuf += parsed.message.thinking
+              onReasoningChunk?.(parsed.message.thinking)
+            }
+            if (Array.isArray(parsed.message?.tool_calls)) {
+              for (const tc of parsed.message.tool_calls) {
+                toolCalls.push({
+                  id: tc.id || `call_${Math.random().toString(36).slice(2)}`,
+                  name: tc.function?.name || '',
+                  argumentsJson:
+                    typeof tc.function?.arguments === 'string'
+                      ? tc.function.arguments
+                      : JSON.stringify(tc.function?.arguments || {})
+                })
+              }
+            }
+            if (parsed.done) {
+              if (typeof parsed.prompt_eval_count === 'number') promptTokens = parsed.prompt_eval_count
+              if (typeof parsed.eval_count === 'number') completionTokens = parsed.eval_count
+            }
+          } catch {
+            // Skip non-JSON or partial lines in stream
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock()
+    }
 
     return {
       content: contentBuf,

@@ -13,6 +13,7 @@ export type StepType =
   | 'read_skill'
   | 'save_skill'
   | 'mcp'
+  | 'browser'
 
 export interface StepStats {
   add?: number
@@ -142,4 +143,6 @@ export interface ChatSession {
   dateGroup?: 'Сегодня' | 'Вчера' | 'СЕГОДНЯ' | 'ВЧЕРА' | string
   messages: ChatMessage[]
   project?: ProjectRef
+  isScheduled?: boolean
+  scheduledTaskId?: string
 }

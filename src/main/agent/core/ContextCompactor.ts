@@ -77,18 +77,18 @@ export class ContextCompactor {
     const usageRatio = estimatedTokens / maxContextTokens
 
     // Dynamic pruning thresholds based on capacity usage
-    let maxToolOutputLen = 6000
-    let headLen = 2000
-    let tailLen = 2000
+    let maxToolOutputLen = 12000
+    let headLen = 4000
+    let tailLen = 4000
 
-    if (usageRatio > 0.8) {
-      maxToolOutputLen = 1200
-      headLen = 500
-      tailLen = 500
-    } else if (usageRatio > 0.6) {
+    if (usageRatio > 0.85) {
       maxToolOutputLen = 3000
-      headLen = 1000
-      tailLen = 1000
+      headLen = 1200
+      tailLen = 1200
+    } else if (usageRatio > 0.7) {
+      maxToolOutputLen = 6000
+      headLen = 2500
+      tailLen = 2500
     }
 
     // 3. Identify active window cutoff index (keep last activeWindowTurns intact)
@@ -129,10 +129,12 @@ export class ContextCompactor {
         content: `### 📋 HISTORICAL PROGRESS SUMMARY (${historicalMessages.length} past messages collapsed for optimal token performance):\n${summaryText}`
       }
 
-      // Compact active messages' tool outputs if needed
+      // Active window tool outputs: keep recent turns intact to prevent truncation panic loops
+      // Only prune truly massive tool outputs (> 24k chars) in the active window
+      const activeMaxLen = Math.max(maxToolOutputLen, 24000)
       const compactedActive = activeMessages.map((msg) => {
         if (msg.role === 'tool') {
-          return this._pruneToolMessage(msg, maxToolOutputLen, headLen, tailLen)
+          return this._pruneToolMessage(msg, activeMaxLen, 8000, 8000)
         }
         return msg
       })

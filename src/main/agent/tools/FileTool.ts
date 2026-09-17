@@ -266,24 +266,26 @@ export class FileTool extends ToolBase {
 
     const content = typeof args.content === 'string' ? args.content : ''
 
+    let existingRaw = ''
+    if (exists) {
+      try {
+        existingRaw = await fs.readFile(filePath, 'utf8')
+      } catch {}
+    }
+
     // Safety check: protect against accidental truncation / placeholder wipeouts
     if (exists && content) {
-      try {
-        const existingRaw = await fs.readFile(filePath, 'utf8')
-        const existingLines = existingRaw.split('\n').length
-        const newLines = content.split('\n').length
+      const existingLines = existingRaw ? existingRaw.split('\n').length : 0
+      const newLines = content.split('\n').length
 
-        // If existing file is substantial and new content is suspicious placeholder
-        if (existingLines >= 40 && newLines < existingLines * 0.4) {
-          const placeholderPattern = /(\/\/\s*\.\.\.\s*(existing|rest|remaining|code|same)|{\s*\/\*\s*\.\.\.\s*\*\/|\/\*\s*\.\.\.\s*(existing|rest|remaining|code|same))/i
-          if (placeholderPattern.test(content)) {
-            return {
-              formattedContent: `Error: write content appears to contain truncation placeholder comments (e.g. "// ... existing code ..."). Overwrite cancelled to prevent code loss.\nTip: File has ${existingLines} lines. To modify specific functions, use action="edit" with start_line/end_line or exact old_content, or provide the complete implementation.`
-            }
+      // If existing file is substantial and new content is suspicious placeholder
+      if (existingLines >= 40 && newLines < existingLines * 0.4) {
+        const placeholderPattern = /(\/\/\s*\.\.\.\s*(existing|rest|remaining|code|same)|{\s*\/\*\s*\.\.\.\s*\*\/|\/\*\s*\.\.\.\s*(existing|rest|remaining|code|same))/i
+        if (placeholderPattern.test(content)) {
+          return {
+            formattedContent: `Error: write content appears to contain truncation placeholder comments (e.g. "// ... existing code ..."). Overwrite cancelled to prevent code loss.\nTip: File has ${existingLines} lines. To modify specific functions, use action="edit" with start_line/end_line or exact old_content, or provide the complete implementation.`
           }
         }
-      } catch {
-        // Fall through to normal write if read check fails
       }
     }
 
@@ -293,15 +295,43 @@ export class FileTool extends ToolBase {
 
     return {
       formattedContent: `Successfully wrote file: ${filePath} (${linesCount} lines)`,
-      data: { path: filePath, linesCount, content }
+      data: {
+        path: filePath,
+        linesCount,
+        content,
+        isNew: !exists,
+        fileAction: exists ? 'modified' : 'created',
+        oldContent: exists ? existingRaw : '',
+        newContent: content,
+        stats: {
+          add: linesCount,
+          del: exists && existingRaw ? existingRaw.split('\n').length : 0
+        }
+      }
     }
   }
 
   private async _handleAppend(filePath: string, args: any): Promise<ToolResult> {
     await fs.mkdir(path.dirname(filePath), { recursive: true })
     const appendContent = typeof args.content === 'string' ? args.content : ''
+    let oldContent = ''
+    try {
+      if (fsSync.existsSync(filePath)) {
+        oldContent = await fs.readFile(filePath, 'utf8')
+      }
+    } catch {}
     await fs.appendFile(filePath, appendContent, 'utf8')
-    return { formattedContent: `Successfully appended to file: ${filePath}` }
+    const newContent = (oldContent ? oldContent + '\n' : '') + appendContent
+    return {
+      formattedContent: `Successfully appended to file: ${filePath}`,
+      data: {
+        path: filePath,
+        fileAction: 'modified',
+        oldContent,
+        newContent,
+        stats: { add: appendContent.split('\n').length, del: 0 }
+      }
+    }
   }
 
   private _parseSearchReplaceBlocks(input: string): Array<{ search: string; replace: string }> {
@@ -564,6 +594,9 @@ export class FileTool extends ToolBase {
         formattedContent: `Successfully edited file: ${filePath} (applied ${parsedBlocks.length} SEARCH/REPLACE block${parsedBlocks.length > 1 ? 's' : ''})`,
         data: {
           path: filePath,
+          fileAction: 'modified',
+          oldContent: raw,
+          newContent: newRaw,
           stats: { add: totalAdded, del: totalDeleted, blocksCount: parsedBlocks.length }
         }
       }
@@ -616,6 +649,9 @@ export class FileTool extends ToolBase {
       formattedContent: `Successfully edited file: ${filePath}`,
       data: {
         path: filePath,
+        fileAction: 'modified',
+        oldContent: raw,
+        newContent: newRaw,
         stats: { add: linesAdded, del: linesDeleted },
         old_content: args.old_content,
         new_content: args.new_content
@@ -776,7 +812,13 @@ export class FileTool extends ToolBase {
 
   private async _handleDelete(filePath: string): Promise<ToolResult> {
     await fs.unlink(filePath)
-    return { formattedContent: `Deleted file: ${filePath}` }
+    return {
+      formattedContent: `Deleted file: ${filePath}`,
+      data: {
+        path: filePath,
+        fileAction: 'deleted'
+      }
+    }
   }
 
   private async _handleCreateDir(dirPath: string): Promise<ToolResult> {

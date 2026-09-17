@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { TitleBar } from './components/TitleBar'
 import { TaskInput } from './components/TaskInput'
 import { Sidebar } from './components/Sidebar'
@@ -19,18 +19,20 @@ const AppInner: React.FC = () => {
   const { config } = useAiSettingsContext()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false)
-  const [rightPanelTab, setRightPanelTab] = useState<'terminal' | 'files'>('terminal')
+  const [rightPanelTab, setRightPanelTab] = useState<'terminal' | 'files' | 'activity' | 'browser'>('terminal')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTab>('models')
   const [activeNavTab, setActiveNavTab] = useState<'dialogs' | 'notes' | 'skills'>('dialogs')
   const [selectedNotesCategory, setSelectedNotesCategory] = useState<string>('all')
   const [isAddingNoteTrigger, setIsAddingNoteTrigger] = useState<boolean>(false)
+  const displacedPanelRef = useRef<'left' | 'right' | null>(null)
 
   const {
     chats,
     activeChatId,
     activeChat,
     isStreaming,
+    streamingChatIds,
     selectChat,
     newChat,
     deleteChat,
@@ -38,9 +40,32 @@ const AppInner: React.FC = () => {
     cancelGeneration
   } = useChatSession(config)
 
-  const handleToggleSidebar = (): void => {
-    setIsSidebarOpen((prev) => !prev)
-  }
+  const handleOpenBrowser = useCallback((): void => {
+    setIsRightPanelOpen(true)
+    setRightPanelTab('browser')
+  }, [])
+
+  // Auto-open right panel on browser tab when AI triggers browser action
+  useEffect(() => {
+    if (!window.api?.browser?.onOpenView) return
+    const unsub = window.api.browser.onOpenView(() => {
+      setIsRightPanelOpen(true)
+      setRightPanelTab('browser')
+    })
+    return () => unsub()
+  }, [])
+
+  const [windowWidth, setWindowWidth] = useState<number>(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 1200
+  )
+
+  useEffect(() => {
+    const handleWindowResize = (): void => {
+      setWindowWidth(window.innerWidth)
+    }
+    window.addEventListener('resize', handleWindowResize)
+    return () => window.removeEventListener('resize', handleWindowResize)
+  }, [])
 
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     try {
@@ -53,39 +78,127 @@ const AppInner: React.FC = () => {
     return 260
   })
 
-  const handleResizeSidebar = useCallback((newWidth: number) => {
-    setSidebarWidth(newWidth)
-    try {
-      localStorage.setItem('zipply_sidebar_width', String(newWidth))
-    } catch {}
-  }, [])
-
   const [rightPanelWidth, setRightPanelWidth] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('zipply_right_panel_width')
       if (saved) {
         const val = parseInt(saved, 10)
-        if (!isNaN(val) && val >= 300 && val <= 1200) return val
+        if (!isNaN(val) && val >= 260 && val <= 900) return val
       }
     } catch {}
     return 440
   })
 
-  const handleResizeRightPanel = useCallback((newWidth: number) => {
-    setRightPanelWidth(newWidth)
-    try {
-      localStorage.setItem('zipply_right_panel_width', String(newWidth))
-    } catch {}
+  const handleCloseRightPanel = useCallback((): void => {
+    setIsRightPanelOpen(false)
+    if (displacedPanelRef.current === 'left') {
+      displacedPanelRef.current = null
+      setIsSidebarOpen(true)
+    }
   }, [])
 
+  const handleToggleSidebar = useCallback((): void => {
+    setIsSidebarOpen((prev) => {
+      const next = !prev
+      if (next) {
+        const needed = sidebarWidth + rightPanelWidth + 360
+        if (isRightPanelOpen && (window.innerWidth < 1020 || window.innerWidth < needed)) {
+          displacedPanelRef.current = 'right'
+          setIsRightPanelOpen(false)
+        } else {
+          displacedPanelRef.current = null
+        }
+      } else {
+        if (displacedPanelRef.current === 'right') {
+          displacedPanelRef.current = null
+          setIsRightPanelOpen(true)
+        }
+      }
+      return next
+    })
+  }, [isRightPanelOpen, sidebarWidth, rightPanelWidth])
+
+  // Auto-collapse or restore panels when window space changes
+  useEffect(() => {
+    const needed = sidebarWidth + rightPanelWidth + 360
+    if (isRightPanelOpen && isSidebarOpen) {
+      if (windowWidth < 1020 || windowWidth < needed) {
+        displacedPanelRef.current = 'left'
+        setIsSidebarOpen(false)
+      }
+    } else if (windowWidth >= 1020 && windowWidth >= needed) {
+      if (displacedPanelRef.current === 'left' && !isSidebarOpen) {
+        displacedPanelRef.current = null
+        setIsSidebarOpen(true)
+      } else if (displacedPanelRef.current === 'right' && !isRightPanelOpen) {
+        displacedPanelRef.current = null
+        setIsRightPanelOpen(true)
+      }
+    }
+  }, [windowWidth, isRightPanelOpen, isSidebarOpen, sidebarWidth, rightPanelWidth])
+
+  const maxRightPanelWidth = Math.max(
+    260,
+    Math.min(windowWidth - (isSidebarOpen ? sidebarWidth : 0) - 300, 900)
+  )
+
+  useEffect(() => {
+    if (rightPanelWidth > maxRightPanelWidth) {
+      setRightPanelWidth(maxRightPanelWidth)
+    }
+  }, [maxRightPanelWidth, rightPanelWidth])
+
+  const handleResizeSidebar = useCallback((newWidth: number) => {
+    const available = window.innerWidth - (isRightPanelOpen ? rightPanelWidth : 0) - 300
+    const maxAllowed = Math.max(200, Math.min(available, 460))
+    const clamped = Math.max(200, Math.min(newWidth, maxAllowed))
+    setSidebarWidth(clamped)
+    try {
+      localStorage.setItem('zipply_sidebar_width', String(clamped))
+    } catch {}
+  }, [isRightPanelOpen, rightPanelWidth])
+
+  const handleResizeRightPanel = useCallback((newWidth: number) => {
+    const available = window.innerWidth - (isSidebarOpen ? sidebarWidth : 0) - 300
+    const maxAllowed = Math.max(260, Math.min(available, 900))
+    const clamped = Math.max(260, Math.min(newWidth, maxAllowed))
+    setRightPanelWidth(clamped)
+    try {
+      localStorage.setItem('zipply_right_panel_width', String(clamped))
+    } catch {}
+  }, [isSidebarOpen, sidebarWidth])
+
   const handleToggleRightPanel = useCallback((): void => {
-    setIsRightPanelOpen((prev) => !prev)
-  }, [])
+    setIsRightPanelOpen((prev) => {
+      const next = !prev
+      if (next) {
+        const needed = (isSidebarOpen ? sidebarWidth : 260) + rightPanelWidth + 360
+        if (isSidebarOpen && (window.innerWidth < 1020 || window.innerWidth < needed)) {
+          displacedPanelRef.current = 'left'
+          setIsSidebarOpen(false)
+        } else {
+          displacedPanelRef.current = null
+        }
+        if (isSettingsOpen && window.innerWidth < 1150) {
+          setIsSettingsOpen(false)
+        }
+      } else {
+        if (displacedPanelRef.current === 'left') {
+          displacedPanelRef.current = null
+          setIsSidebarOpen(true)
+        }
+      }
+      return next
+    })
+  }, [isSidebarOpen, sidebarWidth, rightPanelWidth, isSettingsOpen])
 
   const handleOpenSettings = useCallback((tab: SettingsTab = 'models'): void => {
     setIsSettingsOpen(true)
     setActiveSettingsTab(tab)
     setIsSidebarOpen(true)
+    if (window.innerWidth < 1150) {
+      setIsRightPanelOpen(false)
+    }
   }, [])
 
   const handleCloseSettings = useCallback((): void => {
@@ -237,7 +350,7 @@ const AppInner: React.FC = () => {
         }
         if (isRightPanelOpen) {
           e.preventDefault()
-          setIsRightPanelOpen(false)
+          handleCloseRightPanel()
           return
         }
       }
@@ -247,7 +360,7 @@ const AppInner: React.FC = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isSettingsOpen, isRightPanelOpen, activeNavTab, handleNewChat, handleToggleSidebar, handleToggleRightPanel, handleSelectNavTab])
+  }, [isSettingsOpen, isRightPanelOpen, activeNavTab, handleNewChat, handleToggleSidebar, handleToggleRightPanel, handleCloseRightPanel, handleSelectNavTab])
 
   return (
     <div className="app-container">
@@ -255,6 +368,7 @@ const AppInner: React.FC = () => {
         isOpen={isSidebarOpen}
         chats={chats}
         activeChatId={activeChatId}
+        streamingChatIds={streamingChatIds}
         activeNavTab={activeNavTab}
         selectedNotesCategory={selectedNotesCategory}
         width={sidebarWidth}
@@ -316,11 +430,13 @@ const AppInner: React.FC = () => {
               onSendMessage={handleSendMessage}
               onCancel={cancelGeneration}
               onOpenSettings={handleOpenSettings}
+              onOpenBrowser={handleOpenBrowser}
             />
           ) : (
             <TaskInput
               onSubmit={handleSendMessage}
               onOpenSettings={handleOpenSettings}
+              onOpenBrowser={handleOpenBrowser}
             />
           )}
         </main>
@@ -329,10 +445,11 @@ const AppInner: React.FC = () => {
         isOpen={isRightPanelOpen}
         activeTab={rightPanelTab}
         onSelectTab={setRightPanelTab}
-        panelWidth={rightPanelWidth}
+        panelWidth={Math.min(rightPanelWidth, maxRightPanelWidth)}
         onResize={handleResizeRightPanel}
-        onClose={() => setIsRightPanelOpen(false)}
+        onClose={handleCloseRightPanel}
         activeProject={activeChat?.project || null}
+        activeChat={activeChat || null}
       />
     </div>
   )

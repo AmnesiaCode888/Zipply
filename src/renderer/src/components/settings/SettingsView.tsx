@@ -4,6 +4,7 @@ import { ModelsSettings } from './ModelsSettings'
 import { AppearanceSettings } from './AppearanceSettings'
 import { ShortcutsSettings } from './ShortcutsSettings'
 import { StorageSettings } from './StorageSettings'
+import { AccessSettings } from './AccessSettings'
 import { McpView } from '../mcp/McpView'
 import { ComingSoonSettings } from './ComingSoonSettings'
 import './SettingsView.css'
@@ -19,11 +20,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ activeTab }) => {
     <div className="settings-view-wrapper custom-scrollbar">
       <div className="settings-content-body">
         {activeTab === 'models' && <ModelsSettings />}
+        {activeTab === 'access' && <AccessSettings />}
         {activeTab === 'mcp' && <McpView />}
         {activeTab === 'appearance' && <AppearanceSettings />}
         {activeTab === 'shortcuts' && <ShortcutsSettings />}
         {activeTab === 'storage' && <StorageSettings />}
         {activeTab !== 'models' &&
+          activeTab !== 'access' &&
           activeTab !== 'mcp' &&
           activeTab !== 'appearance' &&
           activeTab !== 'shortcuts' &&

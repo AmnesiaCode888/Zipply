@@ -61,9 +61,9 @@ body.is-resizing-panel * {
 .right-panel-container.open {
   width: 440px;
   min-width: 280px;
-  max-width: calc(100% - 380px);
   opacity: 1;
   pointer-events: auto;
+  flex-shrink: 0;
 }
 
 .right-panel-inner {
@@ -84,25 +84,30 @@ body.is-resizing-panel * {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px 0 14px;
+  padding: 0 14px 0 14px;
   background-color: var(--bg-sidebar, #121212);
   border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
   box-sizing: border-box;
   -webkit-app-region: drag;
   user-select: none;
   flex-shrink: 0;
+  width: 100%;
+  min-width: 0;
 }
 
 .right-panel-header-tabs {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
   -webkit-app-region: no-drag;
 }
 
 .right-panel-icon-tab {
+  position: relative;
   width: 28px;
   height: 28px;
+  flex-shrink: 0;
   border-radius: 6px;
   border: none;
   outline: none !important;
@@ -113,6 +118,25 @@ body.is-resizing-panel * {
   justify-content: center;
   cursor: pointer;
   transition: all 0.15s ease;
+}
+
+.right-panel-tab-badge {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  background-color: rgba(255, 255, 255, 0.18);
+  color: #FFFFFF;
+  font-size: 8.5px;
+  font-weight: 600;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  border-radius: 6px;
+  min-width: 13px;
+  height: 13px;
+  line-height: 13px;
+  text-align: center;
+  padding: 0 3px;
+  box-sizing: border-box;
+  pointer-events: none;
 }
 
 .right-panel-icon-tab:hover {
@@ -128,13 +152,15 @@ body.is-resizing-panel * {
 .right-panel-header-actions {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
+  flex-shrink: 0;
   -webkit-app-region: no-drag;
 }
 
 .right-panel-action-btn {
   width: 26px;
   height: 26px;
+  flex-shrink: 0;
   border-radius: 6px;
   border: none;
   outline: none;
@@ -222,7 +248,7 @@ body.is-resizing-panel * {
 }
 
 .terminal-tab-item:hover {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: var(--btn-bg-hover, rgba(255, 255, 255, 0.05));
   color: var(--text-primary, #FFFFFF);
 }
 
@@ -230,7 +256,7 @@ body.is-resizing-panel * {
   background-color: var(--bg-surface, #1E1E1E);
   color: var(--text-primary, #FFFFFF);
   border-color: var(--border-subtle, rgba(255, 255, 255, 0.12));
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--shadow-card, 0 1px 3px rgba(0, 0, 0, 0.25));
 }
 
 .terminal-tab-icon {
@@ -245,11 +271,11 @@ body.is-resizing-panel * {
 }
 
 .terminal-tab-icon-ai {
-  color: #60A5FA;
+  color: var(--text-secondary, #A1A1AA);
 }
 
 .terminal-tab-item.active .terminal-tab-icon-ai {
-  color: #93C5FD;
+  color: var(--text-primary, #FFFFFF);
 }
 
 .terminal-running-dot {
@@ -325,28 +351,42 @@ body.is-resizing-panel * {
   color: var(--text-primary, #FFFFFF);
 }
 
-/* ─── Authentic IDE Terminal Canvas (VS Code / Cursor style) ─── */
+.terminal-tab-item.dragging {
+  opacity: 0.4;
+  border-style: dashed !important;
+  border-color: var(--border-hover, rgba(255, 255, 255, 0.25)) !important;
+  cursor: grabbing !important;
+}
+
+.terminal-tab-item.drag-over {
+  border-color: var(--border-hover, rgba(255, 255, 255, 0.35)) !important;
+  background-color: var(--btn-bg-hover, rgba(255, 255, 255, 0.08)) !important;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.3) !important;
+  transform: translateY(-1px);
+}
+
+/* ─── Authentic IDE Terminal Canvas (Zipply Theme Native) ─── */
 .ide-terminal-canvas {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 12px 14px;
-  background-color: var(--bg-sidebar, #121212);
-  color: var(--text-primary, #FFFFFF);
-  font-family: var(--font-mono, 'Consolas', monospace);
+  background-color: var(--code-bg, var(--bg-sidebar, #121212));
+  color: var(--code-text, var(--text-primary, #FFFFFF));
+  font-family: var(--font-mono, 'JetBrains Mono', Consolas, monospace);
   font-size: 12px;
-  line-height: 1.45;
+  line-height: 1.5;
   cursor: text;
   box-sizing: border-box;
   user-select: text;
 }
 
 .ide-terminal-canvas::-webkit-scrollbar {
-  width: 4px;
+  width: 5px;
 }
 
 .ide-terminal-canvas::-webkit-scrollbar-thumb {
-  background-color: var(--border-subtle, rgba(255, 255, 255, 0.1));
+  background-color: var(--border-hover, rgba(255, 255, 255, 0.18));
   border-radius: 4px;
 }
 
@@ -359,62 +399,69 @@ body.is-resizing-panel * {
 }
 
 .ide-term-entry {
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .ide-term-line {
-  font-family: var(--font-mono, 'Consolas', monospace);
+  font-family: var(--font-mono, 'JetBrains Mono', Consolas, monospace);
   font-size: 12px;
-  line-height: 1.45;
+  line-height: 1.5;
   word-break: break-all;
   white-space: pre-wrap;
   user-select: text;
+  color: var(--code-text, var(--text-primary, #FFFFFF));
 }
 
 .ide-term-cmd-row {
   display: flex;
   flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
 }
 
 .ide-term-ps {
+  color: var(--text-muted, #71717A);
+  user-select: none;
+  font-weight: 600;
+}
+
+.ide-term-path {
   color: var(--text-secondary, #A1A1AA);
   user-select: none;
   font-weight: 500;
 }
 
-.ide-term-path {
-  color: var(--text-muted, #71717A);
-  user-select: none;
-}
-
 .ide-term-cmd {
   color: var(--text-primary, #FFFFFF);
+  font-weight: 600;
   word-break: break-all;
 }
 
 .ide-term-output-stream {
-  color: var(--text-secondary, rgba(255, 255, 255, 0.75));
-  margin-top: 1px;
+  color: var(--code-text, var(--text-primary, #FFFFFF));
+  margin-top: 2px;
 }
 
 .ide-term-err {
-  color: #EF4444;
+  color: var(--btn-red, #EF4444) !important;
+  font-weight: 500;
 }
 
 /* ─── Active Inline Prompt Line ─── */
 .ide-term-active-line {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   width: 100%;
   position: relative;
-  min-height: 18px;
+  min-height: 20px;
 }
 
 .ide-term-input-box {
   flex: 1;
   display: flex;
   align-items: baseline;
-  min-width: 0;
+  min-width: 80px;
 }
 
 .ide-term-real-input {
@@ -424,12 +471,13 @@ body.is-resizing-panel * {
   outline: none !important;
   box-shadow: none !important;
   color: var(--text-primary, #FFFFFF) !important;
-  font-family: var(--font-mono, 'Consolas', monospace) !important;
+  font-family: var(--font-mono, 'JetBrains Mono', Consolas, monospace) !important;
   font-size: 12px !important;
-  line-height: 1.45 !important;
+  font-weight: 500 !important;
+  line-height: 1.5 !important;
   padding: 0 !important;
   margin: 0 !important;
-  caret-color: var(--text-primary, #FFFFFF);
+  caret-color: var(--accent-primary, var(--text-primary, #FFFFFF));
 }
 
 .ide-term-real-input:focus,
@@ -445,7 +493,7 @@ body.is-resizing-panel * {
 }
 
 .ide-term-stdin-prompt {
-  color: var(--accent-color, #E4A853);
+  color: var(--accent-text, var(--btn-yellow, #E4A853));
   font-weight: 600;
   user-select: none;
   margin-right: 4px;

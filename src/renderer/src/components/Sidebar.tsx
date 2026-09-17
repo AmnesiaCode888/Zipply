@@ -20,7 +20,10 @@ import {
   X,
   Trash2,
   HardDrive,
-  Boxes
+  Boxes,
+  Clock,
+  Loader2,
+  Bot
 } from 'lucide-react'
 import { ChatSession } from '../types/chat'
 import { SettingsTab } from '../types/settings'
@@ -30,6 +33,7 @@ interface SidebarProps {
   isOpen: boolean
   chats: ChatSession[]
   activeChatId: string | null
+  streamingChatIds?: Set<string>
   activeNavTab: 'dialogs' | 'notes' | 'skills'
   selectedNotesCategory?: string
   onSelectNavTab: (tab: 'dialogs' | 'notes' | 'skills') => void
@@ -63,6 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   chats,
   activeChatId,
+  streamingChatIds,
   activeNavTab = 'dialogs',
   selectedNotesCategory = 'all',
   width = 260,
@@ -99,10 +104,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         if (!isDraggingRef.current) return
         const deltaX = ev.clientX - startXRef.current
         const rawNewWidth = startWidthRef.current + deltaX
-        const minW = 200
         const rightPanelEl = document.querySelector('.right-panel-container.open') as HTMLElement | null
         const currentRightPanelW = rightPanelEl ? rightPanelEl.offsetWidth : 0
-        const maxW = Math.max(minW, Math.min(window.innerWidth - currentRightPanelW - 380, 460))
+        const availableSpace = window.innerWidth - currentRightPanelW - 340
+        const maxW = Math.max(200, Math.min(availableSpace, 460))
+        const minW = Math.min(200, maxW)
         const clamped = Math.max(minW, Math.min(rawNewWidth, maxW))
         onResize?.(clamped)
       }
@@ -148,10 +154,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const renderChatItem = (chat: ChatSession) => {
     const isActive = activeChatId === chat.id
+    const isStreamingThisChat = Boolean(streamingChatIds?.has(chat.id))
     return (
       <div
         key={chat.id}
-        className={`sidebar-history-item-row ${isActive ? 'active' : ''}`}
+        className={`sidebar-history-item-row ${isActive ? 'active' : ''} ${isStreamingThisChat ? 'is-streaming' : ''}`}
       >
         <button
           type="button"
@@ -159,6 +166,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => onSelectChat(chat.id)}
           title={chat.title}
         >
+          {isStreamingThisChat ? (
+            <span className="sidebar-streaming-icon" title="Идёт генерация ответа...">
+              <Loader2 size={13} strokeWidth={2.4} className="sidebar-stream-spin" />
+            </span>
+          ) : chat.isScheduled ? (
+            <span className="sidebar-scheduled-icon" title="Запланированная задача">
+              <Clock size={13} strokeWidth={2} />
+            </span>
+          ) : null}
           <span className="sidebar-chat-title">{chat.title}</span>
           {chat.project?.name && (
             <span className="sidebar-project-tag" title={chat.project.path}>
@@ -186,6 +202,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const settingsCategories: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
     { id: 'models', label: 'Конфигурация', icon: <SlidersHorizontal size={17} strokeWidth={1.8} /> },
+    { id: 'access', label: 'Доступ', icon: <Bot size={17} strokeWidth={1.8} /> },
     { id: 'mcp', label: 'MCP Серверы', icon: <Boxes size={17} strokeWidth={1.8} /> },
     { id: 'appearance', label: 'Темы и оформление', icon: <Palette size={17} strokeWidth={1.8} /> },
     { id: 'shortcuts', label: 'Горячие клавиши', icon: <Keyboard size={17} strokeWidth={1.8} /> },

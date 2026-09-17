@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, session } from 'electron'
 import { spawn, execSync, ChildProcess } from 'child_process'
 import * as fs from 'fs'
 import { join, normalize, dirname, basename } from 'path'
@@ -12,6 +12,8 @@ import { SchedulerService } from './agent/services/SchedulerService'
 import { McpService } from './agent/services/McpService'
 import { LocalStorageService } from './services/LocalStorageService'
 import { TerminalSessionManager } from './services/TerminalSessionManager'
+import { BrowserSessionManager } from './services/BrowserSessionManager'
+import { TelegramBotService } from './services/TelegramBotService'
 
 app.name = 'Zipply'
 
@@ -68,7 +70,8 @@ function createWindow(): void {
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
-      contextIsolation: true
+      contextIsolation: true,
+      webviewTag: true
     }
   })
 
@@ -108,10 +111,29 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // Allow embedded browser (<webview>) to display any site by stripping X-Frame-Options and frame-ancestors restrictions
+  session.defaultSession.webRequest.onHeadersReceived({ urls: ['*://*/*'] }, (details, callback) => {
+    const responseHeaders = { ...details.responseHeaders }
+    delete responseHeaders['x-frame-options']
+    delete responseHeaders['X-Frame-Options']
+    if (responseHeaders['content-security-policy']) {
+      responseHeaders['content-security-policy'] = responseHeaders['content-security-policy'].map((csp) =>
+        csp.replace(/frame-ancestors\s+[^;]+;?/gi, '')
+      )
+    }
+    if (responseHeaders['Content-Security-Policy']) {
+      responseHeaders['Content-Security-Policy'] = responseHeaders['Content-Security-Policy'].map((csp) =>
+        csp.replace(/frame-ancestors\s+[^;]+;?/gi, '')
+      )
+    }
+    callback({ cancel: false, responseHeaders })
+  })
+
   // Initialize Persistent Local Storage, Background Scheduler & Default Skills
   LocalStorageService.init()
   SchedulerService.init()
   SkillService.init()
+  TelegramBotService.init()
 
   // Window controls
   ipcMain.handle('window:minimize', (event) => {
@@ -215,15 +237,22 @@ app.whenReady().then(() => {
     activeControllers.set(requestId, controller)
 
     try {
+      let finalSnippet = ''
       await runAgent(
         agentId || 'zipply',
         history,
         settings,
         (agentEvent) => {
+          if (agentEvent.type === 'token') {
+            finalSnippet = (finalSnippet + agentEvent.content).slice(-300)
+          }
           safeSend(event.sender, 'agent:event', { ...agentEvent, requestId })
         },
         controller.signal
       )
+      if (settings?.chatId) {
+        TelegramBotService.notifyDesktopTaskCompleted(settings.chatId, settings.title, finalSnippet).catch(() => {})
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       safeSend(event.sender, 'agent:event', { type: 'error', message: msg, requestId })
@@ -399,6 +428,12 @@ app.whenReady().then(() => {
   ipcMain.handle('skills:togglePackage', (_, { skillNames, enabled }) =>
     SkillService.togglePackageEnabled(skillNames, enabled)
   )
+  ipcMain.handle('skills:toggleCategory', (_, { category, enabled, workspacePath }) =>
+    SkillService.toggleCategoryEnabled(category, enabled, workspacePath)
+  )
+  ipcMain.handle('skills:transfer', (_, { items, targetCategory, isCore }) =>
+    SkillService.transferSkills(items, targetCategory, isCore)
+  )
   ipcMain.handle('skills:deleteMultiple', (_, { items }) =>
     SkillService.deleteMultipleSkills(items)
   )
@@ -510,6 +545,19 @@ app.whenReady().then(() => {
     return true
   })
   ipcMain.handle('storage:openFolder', () => LocalStorageService.openStorageFolder())
+
+  // Telegram Bot Remote Access
+  ipcMain.handle('telegram:getConfig', () => TelegramBotService.getConfig())
+  ipcMain.handle('telegram:saveConfig', (_, patch) => TelegramBotService.saveConfig(patch))
+  ipcMain.handle('telegram:start', () => TelegramBotService.start())
+  ipcMain.handle('telegram:stop', () => TelegramBotService.stop())
+  ipcMain.handle('telegram:getStatus', () => TelegramBotService.getStatus())
+  ipcMain.handle('telegram:testToken', (_, { token }) => TelegramBotService.testToken(token))
+  ipcMain.handle('telegram:getModels', () => TelegramBotService.getAvailableModels())
+  ipcMain.handle('telegram:setModel', (_, { model }) => TelegramBotService.setModel(model))
+  ipcMain.on('telegram:activeChatChanged', (_, { chatId }) => {
+    TelegramBotService.setActiveDesktopChatId(chatId || null)
+  })
 
   ipcMain.handle('storage:exportBackup', async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender) || mainWindow
@@ -699,6 +747,26 @@ app.whenReady().then(() => {
     }
   })
 
+  ipcMain.handle('files:readFile', async (_event, filePath: string) => {
+    try {
+      if (!filePath || !fs.existsSync(filePath)) {
+        return { success: false, error: 'Файл не найден' }
+      }
+      const stat = fs.statSync(filePath)
+      if (stat.isDirectory()) {
+        return { success: false, error: 'Указанный путь является папкой' }
+      }
+      if (stat.size > 10 * 1024 * 1024) {
+        return { success: false, error: 'Файл слишком большой для просмотра (>10 МБ)' }
+      }
+      const content = fs.readFileSync(filePath, 'utf8')
+      return { success: true, content }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      return { success: false, error: msg }
+    }
+  })
+
   // Interactive User Terminal IPC
   ipcMain.on('terminal:run', (event, { runId, command, cwd, sessionId }: { runId: string; command: string; cwd?: string; sessionId?: string }) => {
     if (!command || typeof command !== 'string') return
@@ -711,13 +779,26 @@ app.whenReady().then(() => {
 
     const shell = isWin ? (process.env.POWERSHELL_PATH || 'powershell.exe') : (process.env.SHELL || '/bin/sh')
     const args = isWin
-      ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', `$OutputEncoding = [Console]::InputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${command}`]
+      ? [
+          '-NoProfile',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          `[Console]::InputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $OutputEncoding = [System.Text.Encoding]::UTF8; try { chcp 65001 >$null } catch {}; ${command}`
+        ]
       : ['-c', command]
 
     try {
       const child = spawn(shell, args, {
         cwd: resolvedCwd,
-        env: { ...process.env, PYTHONUNBUFFERED: '1', FORCE_COLOR: '0' },
+        env: {
+          ...process.env,
+          PYTHONUNBUFFERED: '1',
+          PYTHONIOENCODING: 'utf-8',
+          TERM: 'xterm-256color',
+          COLORTERM: 'truecolor',
+          LANG: 'en_US.UTF-8'
+        },
         windowsHide: true
       })
 
@@ -788,6 +869,17 @@ app.whenReady().then(() => {
     return LocalStorageService.getDefaultProjectsDir()
   })
 
+  // Browser IPC handlers
+  ipcMain.on('browser:action:response', (_event, response) => {
+    BrowserSessionManager.getInstance().handleResponse(response)
+  })
+
+  ipcMain.on('browser:openView', (_event, data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      safeSend(mainWindow.webContents, 'browser:openView', data)
+    }
+  })
+
   createWindow()
 
   app.on('activate', function () {
@@ -797,6 +889,8 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   try {
+    TelegramBotService.stop()
+    BrowserSessionManager.getInstance().cleanup()
     TerminalSessionManager.getInstance().killAll()
     McpService.stopAll()
   } catch {}
@@ -804,6 +898,8 @@ app.on('before-quit', () => {
 
 app.on('window-all-closed', () => {
   try {
+    TelegramBotService.stop()
+    BrowserSessionManager.getInstance().cleanup()
     TerminalSessionManager.getInstance().killAll()
     McpService.stopAll()
   } catch {}

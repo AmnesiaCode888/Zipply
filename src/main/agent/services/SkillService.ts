@@ -3,6 +3,7 @@ import path from 'path'
 import os from 'os'
 import { app, shell } from 'electron'
 import { EmbeddingService, EmbeddingConfig } from './EmbeddingService'
+import { DEFAULT_SKILLS, DEFAULT_SKILLS_VERSION } from './DefaultSkillsData'
 
 export interface SkillMetadata {
   name?: string
@@ -38,6 +39,9 @@ export interface SkillItem {
   files?: string[]
   enabled?: boolean
   suite?: string
+  category?: string
+  categoryLabel?: string
+  categoryIcon?: string
   embedding?: number[]
   similarityScore?: number
   matchReason?: string
@@ -170,13 +174,32 @@ export class SkillService {
     this.init()
     const set = this.getDisabledSkills()
     const key = nameOrId.toLowerCase().trim()
-    const currentlyDisabled = set.has(key)
-    const newEnabled = enabled !== undefined ? enabled : currentlyDisabled
+    const safeKey = this.sanitizeSkillName(key)
+    
+    // Find matching skill to grab its full canonical name & ID
+    const all = this.getAllSkills()
+    const match = all.find(
+      (s) => s.name.toLowerCase() === key || s.id.toLowerCase() === key || this.sanitizeSkillName(s.name) === safeKey
+    )
 
-    if (newEnabled) {
-      set.delete(key)
-    } else {
-      set.add(key)
+    const isCurrentlyDisabled = match
+      ? match.enabled === false
+      : set.has(key) || set.has(safeKey)
+    const newEnabled = enabled !== undefined ? enabled : isCurrentlyDisabled
+
+    const keysToUpdate = new Set<string>([key, safeKey])
+    if (match) {
+      keysToUpdate.add(match.name.toLowerCase().trim())
+      keysToUpdate.add(match.id.toLowerCase().trim())
+      keysToUpdate.add(this.sanitizeSkillName(match.name))
+    }
+
+    for (const k of keysToUpdate) {
+      if (newEnabled) {
+        set.delete(k)
+      } else {
+        set.add(k)
+      }
     }
     this.saveDisabledSkills(set)
     return { success: true, enabled: newEnabled }
@@ -211,6 +234,158 @@ export class SkillService {
     return { success: true, deletedCount }
   }
 
+  static getCategoryMeta(categoryKey: string): { label: string; icon: string } {
+    const clean = (categoryKey || 'custom').toLowerCase().trim()
+    switch (clean) {
+      case 'system':
+        return { label: 'Системные правила', icon: 'ShieldAlert' }
+      case 'tools':
+        return { label: 'Инструменты Zipply', icon: 'Wrench' }
+      case 'engineering':
+        return { label: 'Разработка и стек', icon: 'Cpu' }
+      case 'workspace':
+        return { label: 'Текущий проект', icon: 'FolderGit2' }
+      case 'codex':
+        return { label: 'Codex', icon: 'Sparkles' }
+      case 'claude':
+        return { label: 'Claude / Инструкции', icon: 'Bot' }
+      case 'custom':
+        return { label: 'Пользовательские', icon: 'User' }
+      default:
+        return { label: clean.charAt(0).toUpperCase() + clean.slice(1), icon: 'Folder' }
+    }
+  }
+
+  static getDisabledCategoriesPath(): string {
+    return path.join(this.getSkillsDir(), 'disabled_categories.json')
+  }
+
+  static getDisabledCategories(): Set<string> {
+    try {
+      const p = this.getDisabledCategoriesPath()
+      if (fs.existsSync(p)) {
+        const data = JSON.parse(fs.readFileSync(p, 'utf-8'))
+        if (Array.isArray(data)) return new Set(data.map((x) => String(x).toLowerCase().trim()))
+      }
+    } catch {}
+    return new Set()
+  }
+
+  static saveDisabledCategories(set: Set<string>): void {
+    try {
+      const p = this.getDisabledCategoriesPath()
+      const dir = path.dirname(p)
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+      fs.writeFileSync(p, JSON.stringify(Array.from(set), null, 2), 'utf-8')
+    } catch (e) {
+      console.warn('[SkillService] Failed to save disabled categories:', e)
+    }
+  }
+
+  static toggleCategoryEnabled(categoryKey: string, enabled: boolean, workspacePath?: string): { success: boolean; count: number } {
+    this.init()
+    const targetCat = (categoryKey || '').toLowerCase().trim()
+    const allSkills = this.getAllSkills(workspacePath)
+    const catSkills = allSkills.filter((s) => (s.category || 'custom').toLowerCase() === targetCat)
+    
+    const disabledSkills = this.getDisabledSkills()
+    let count = 0
+
+    for (const skill of catSkills) {
+      const nameKey = skill.name.toLowerCase().trim()
+      const idKey = skill.id.toLowerCase().trim()
+      if (enabled) {
+        if (disabledSkills.delete(nameKey)) count++
+        disabledSkills.delete(idKey)
+      } else {
+        if (!disabledSkills.has(nameKey)) {
+          disabledSkills.add(nameKey)
+          count++
+        }
+        disabledSkills.add(idKey)
+      }
+    }
+    this.saveDisabledSkills(disabledSkills)
+
+    const disabledCats = this.getDisabledCategories()
+    if (enabled) {
+      disabledCats.delete(targetCat)
+    } else {
+      disabledCats.add(targetCat)
+    }
+    this.saveDisabledCategories(disabledCats)
+
+    return { success: true, count }
+  }
+
+  static transferSkills(
+    items: Array<{ name: string; sourcePath: string; isFolder?: boolean }>,
+    targetCategory: string = 'custom',
+    isCore: boolean = false
+  ): { success: boolean; count: number; error?: string } {
+    this.init()
+    try {
+      const cleanCat = this.sanitizeSkillName(targetCategory || 'custom')
+      const targetDir = isCore ? this.getCoreDir() : path.join(this.getExtraDir(), cleanCat)
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true })
+      }
+
+      let count = 0
+      for (const item of items) {
+        if (!item.sourcePath || !fs.existsSync(item.sourcePath)) continue
+        const safeName = this.sanitizeSkillName(item.name || path.basename(item.sourcePath))
+        const stats = fs.statSync(item.sourcePath)
+
+        if (stats.isDirectory()) {
+          const dest = path.join(targetDir, safeName)
+          if (fs.existsSync(dest)) {
+            fs.rmSync(dest, { recursive: true, force: true })
+          }
+          fs.cpSync(item.sourcePath, dest, { recursive: true })
+
+          // Update frontmatter in transferred folder skill
+          const skillMd = path.join(dest, 'SKILL.md')
+          const lowercaseMd = path.join(dest, 'skill.md')
+          const targetMd = fs.existsSync(skillMd) ? skillMd : fs.existsSync(lowercaseMd) ? lowercaseMd : null
+          if (targetMd) {
+            try {
+              const raw = fs.readFileSync(targetMd, 'utf-8')
+              const { metadata, body } = this.parseRawContent(raw)
+              metadata.isCore = isCore
+              if (!isCore) metadata.category = cleanCat
+              const yaml = Object.entries(metadata)
+                .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+                .join('\n')
+              fs.writeFileSync(targetMd, `---\n${yaml}\n---\n\n${body}`, 'utf-8')
+            } catch {}
+          }
+          count++
+        } else if (stats.isFile()) {
+          const dest = path.join(targetDir, `${safeName}.md`)
+          try {
+            const raw = fs.readFileSync(item.sourcePath, 'utf-8')
+            const { metadata, body } = this.parseRawContent(raw)
+            metadata.isCore = isCore
+            if (!isCore) metadata.category = cleanCat
+            const yaml = Object.entries(metadata)
+              .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+              .join('\n')
+            fs.writeFileSync(dest, `---\n${yaml}\n---\n\n${body}`, 'utf-8')
+          } catch {
+            fs.copyFileSync(item.sourcePath, dest)
+          }
+          count++
+        }
+      }
+
+      return { success: true, count }
+    } catch (e: any) {
+      console.error('[SkillService] Failed to transfer skills:', e)
+      return { success: false, count: 0, error: e?.message || 'Ошибка переноса навыков' }
+    }
+  }
+
   static getCoreDir(): string {
     return path.join(this.getSkillsDir(), 'core')
   }
@@ -243,310 +418,28 @@ export class SkillService {
   private static _seedDefaultSkills(): void {
     try {
       const extraDir = this.getExtraDir()
+      const versionFile = path.join(this.getSkillsDir(), '.skills_version')
+      let installedVersion = 0
 
-      // 1. Clean Code & Safe Operations
-      const codeStandardsPath = path.join(extraDir, 'code-standards.md')
-      if (!fs.existsSync(codeStandardsPath)) {
-        const extraCleanCode = `---
-name: code-standards
-description: Базовые стандарты чистого кода, безопасные операции и минимальные правки
-globs: ["src/**", "*.ts", "*.tsx", "*.js", "*.py", "*.cs"]
-triggers: ["код", "рефакторинг", "правки", "стандарты", "чистый код"]
-tags: ["clean-code", "standards", "safety"]
----
-
-## Принципы разработки:
-1. **Минимальные изменения**: Не трогай несвязанный код и не удаляй существующие комментарии без явной необходимости.
-2. **Безопасные команды**: Никогда не запускай деструктивные команды (\`rm -rf /\`, \`git reset --hard\`) без предупреждения.
-3. **Обработка ошибок**: Всегда оборачивай асинхронные вызовы и операции ввода/вывода в \`try/catch\` с понятными сообщениями.
-4. **Типизация**: Соблюдай строгую типизацию TypeScript, избегай необоснованного использования \`any\`.
-`
-        fs.writeFileSync(codeStandardsPath, extraCleanCode, 'utf-8')
+      if (fs.existsSync(versionFile)) {
+        try {
+          installedVersion = parseInt(fs.readFileSync(versionFile, 'utf-8').trim(), 10) || 0
+        } catch {}
       }
 
-      // 2. Git Advanced Workflows
-      const gitWorkflowsPath = path.join(extraDir, 'git-workflows.md')
-      if (!fs.existsSync(gitWorkflowsPath)) {
-        const extraGit = `---
-name: git-workflows
-description: Продвинутая работа с Git, разрешение конфликтов слияния и чистка веток
-triggers: ["git", "ветка", "коммит", "слияние", "конфликт", "мерж", "rebase"]
-tags: ["git", "vcs"]
-tools: ["terminal", "file", "grep_search"]
----
+      const shouldUpdate = installedVersion < DEFAULT_SKILLS_VERSION
 
-## Инструкции по Git:
-1. Перед началом работы всегда проверяй текущий статус через \`git status\` и активную ветку.
-2. Для разрешения конфликтов слияния находи маркеры \`<<<<<<<\`, \`=======\`, \`>>>>>>>\` и сохраняй валидный код с обеих сторон.
-3. Очистка смерженных локальных веток (PowerShell): \`git branch --merged | Where-Object { $_ -notmatch '\\*' } | ForEach-Object { git branch -d $_.Trim() }\`.
-4. Для отката конкретного файла используй \`git checkout HEAD -- <file>\`.
-`
-        fs.writeFileSync(gitWorkflowsPath, extraGit, 'utf-8')
+      for (const skill of DEFAULT_SKILLS) {
+        const targetPath = path.join(extraDir, skill.fileName)
+        if (!fs.existsSync(targetPath) || shouldUpdate) {
+          fs.writeFileSync(targetPath, skill.content, 'utf-8')
+        }
       }
 
-      // 3. Docker Management
-      const dockerPath = path.join(extraDir, 'docker-management.md')
-      if (!fs.existsSync(dockerPath)) {
-        const extraDocker = `---
-name: docker-management
-description: Диагностика и управление Docker контейнерами, анализ логов и сетей
-globs: ["Dockerfile*", "docker-compose*.yml", "docker-compose*.yaml", ".dockerignore"]
-triggers: ["docker", "compose", "контейнер", "образ", "docker-compose"]
-tags: ["docker", "devops", "container"]
-tools: ["terminal"]
----
-
-## Инструкции по Docker:
-1. Проверка состояния: \`docker ps -a\` с анализом кодов завершения (Exit code != 0).
-2. Анализ логов: \`docker logs --tail 100 --timestamps <container_id>\`.
-3. Проверка использования ресурсов: \`docker stats --no-stream\`.
-4. Очистка зависших ресурсов: \`docker system prune -f\`.
-`
-        fs.writeFileSync(dockerPath, extraDocker, 'utf-8')
-      }
-
-      // 4. MCP Builder & Integration (Model Context Protocol)
-      const mcpBuilderPath = path.join(extraDir, 'mcp-builder.md')
-      if (!fs.existsSync(mcpBuilderPath)) {
-        const mcpSkillContent = `---
-name: mcp-builder
-description: Создание, разработка, отладка и интеграция MCP серверов (Model Context Protocol) на Node.js/TypeScript и Python с автоматическим подключением в Zipply
-globs: ["*mcp*", "mcp.json", "*.mcp.*", "claude_desktop_config.json", "src/mcp/**", "mcp/**"]
-triggers: ["mcp", "мсп", "mcp сервер", "создать mcp", "написать mcp", "создание mcp", "разработка mcp", "model context protocol", "создай инструмент mcp", "mcp tools", "mcp tool", "создать сервер mcp", "подключи mcp", "добавить mcp"]
-tags: ["mcp", "protocol", "tools", "agent-extension", "developer"]
-tools: ["terminal", "file", "grep_search", "call_mcp_tool", "manage_mcp"]
----
-
-## Руководство по разработке и подключению MCP (Model Context Protocol) серверов
-
-Model Context Protocol (MCP) — открытый стандарт для расширения возможностей ИИ-ассистентов с помощью внешних инструментов (Tools), контекстных ресурсов (Resources) и шаблонов промптов (Prompts).
-
-### 1. Архитектура и ключевые правила:
-1. **Протокол**: JSON-RPC 2.0.
-2. **Транспорты**:
-   - \`stdio\`: запуск как дочерний процесс через стандартные потоки ввода/вывода (stdin/stdout).
-   - \`sse / http\`: сервер с поддержкой Server-Sent Events для удаленного подключения.
-3. ⚠️ **КРИТИЧЕСКОЕ ПРАВИЛО ДЛЯ STDIO**:
-   - **НИКОГДА не выводить произвольный текст или \`console.log()\` в stdout!**
-   - Любой вывод кроме JSON-RPC сообщений ломает парсер протокола.
-   - Для отладочного логирования ВСЕГДА используйте \`console.error(...)\` (Node.js) или \`sys.stderr.write(...)\` / модуль \`logging\` (Python).
-
----
-
-### 2. Подключение готового MCP сервера (Автоматически через ИИ)
-
-Если пользователь просит подключить или настроить готовый MCP сервер (например, SQLite, Filesystem, GitHub, Fetch), используй инструмент **\`manage_mcp\`**:
-
-\`\`\`json
-manage_mcp({
-  "action": "add_server",
-  "name": "sqlite",
-  "command": "npx",
-  "args": ["-y", "@modelcontextprotocol/server-sqlite", "--db-path", "app.db"],
-  "server_description": "SQLite база данных проекта"
-})
-\`\`\`
-
-После вызова \`manage_mcp\` сервер мгновенно регистрируется в Zipply, запускается, появляется в окне Настроек («MCP Серверы») и его инструменты становятся доступны для вызова.
-
----
-
-### 3. Шаблон MCP сервера на TypeScript / Node.js
-
-#### Инициализация:
-\`\`\`bash
-mkdir my-mcp-server && cd my-mcp-server
-npm init -y
-npm install @modelcontextprotocol/sdk zod
-npm install -D typescript @types/node tsx
-npx tsc --init
-\`\`\`
-
-#### Код сервера (\`src/index.ts\`):
-\`\`\`typescript
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  ErrorCode,
-  McpError
-} from "@modelcontextprotocol/sdk/types.js";
-import { z } from "zod";
-
-const server = new Server(
-  {
-    name: "my-mcp-server",
-    version: "1.0.0",
-  },
-  {
-    capabilities: {
-      tools: {},
-    },
-  }
-);
-
-// 1. Определение списка доступных инструментов
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return {
-    tools: [
-      {
-        name: "execute_action",
-        description: "Выполняет полезное действие и возвращает результат",
-        inputSchema: {
-          type: "object",
-          properties: {
-            target: {
-              type: "string",
-              description: "Целевой объект или параметр действия",
-            },
-            count: {
-              type: "number",
-              description: "Количество повторений (опционально)",
-            },
-          },
-          required: ["target"],
-        },
-      },
-    ],
-  };
-});
-
-// 2. Обработка вызова инструментов
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
-
-  if (name === "execute_action") {
-    const target = String(args?.target || "");
-    const count = Number(args?.count || 1);
-
-    try {
-      // Логика работы инструмента:
-      const resultData = \`Успешно обработан объект "\${target}" (x\${count})\`;
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: resultData,
-          },
-        ],
-      };
-    } catch (err: any) {
-      return {
-        isError: true,
-        content: [
-          {
-            type: "text",
-            text: \`Ошибка выполнения: \${err.message}\`,
-          },
-        ],
-      };
-    }
-  }
-
-  throw new McpError(ErrorCode.MethodNotFound, \`Неизвестный инструмент: \${name}\`);
-});
-
-// 3. Запуск сервера через stdio
-async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("MCP сервер успешно запущен через stdio");
-}
-
-main().catch((err) => {
-  console.error("Критическая ошибка запуска MCP сервера:", err);
-  process.exit(1);
-});
-\`\`\`
-
----
-
-### 4. Шаблон MCP сервера на Python (FastMCP)
-
-#### Инициализация:
-\`\`\`bash
-pip install "mcp[cli]"
-\`\`\`
-
-#### Код сервера (\`server.py\`):
-\`\`\`python
-import sys
-from mcp.server.fastmcp import FastMCP
-
-# Создаем инстанс сервера
-mcp = FastMCP("python-mcp-server")
-
-@mcp.tool()
-def fetch_data(query: str, limit: int = 10) -> str:
-    """
-    Поиск и извлечение данных по заданному запросу.
-    
-    Args:
-        query: Поисковый запрос
-        limit: Максимальное количество записей
-    """
-    try:
-        # Логирование только в stderr!
-        sys.stderr.write(f"Обработка запроса: {query}\\n")
-        return f"Результаты по запросу '{query}' (лимит: {limit})"
-    except Exception as e:
-        return f"Ошибка: {str(e)}"
-
-if __name__ == "__main__":
-    mcp.run(transport="stdio")
-\`\`\`
-
----
-
-### 4. Подключение и регистрация MCP сервера в Zipply
-
-После написания MCP сервера его можно подключить в Zipply одним из способов:
-
-#### Способ А: Через интерфейс Zipply
-1. Открыть раздел **MCP** в боковом меню (или нажать <kbd>Ctrl</kbd> + <kbd>4</kbd>).
-2. Нажать **«Новый сервер»**.
-3. Заполнить параметры:
-   - **Имя**: например, \`my-server\`
-   - **Команда**: \`node\` (или \`npx\` / \`uvx\` / \`python\`)
-   - **Аргументы**: \`dist/index.js\` (или \`server.py\`)
-   - **CWD**: путь к директории проекта сервера
-   - **Env**: необходимые токены и ключи API
-
-#### Способ Б: Через импорт JSON
-В модальном окне «Импорт» вставить конфигурацию:
-\`\`\`json
-{
-  "mcpServers": {
-    "my-server": {
-      "command": "node",
-      "args": ["C:/Projects/my-mcp-server/dist/index.js"],
-      "env": {
-        "API_TOKEN": "секретный_токен"
-      }
-    }
-  }
-}
-\`\`\`
-
-#### Способ В: Автоматическая проверка
-Нажмите кнопку **«Переподключить / Тест»** на карточке сервера. Zipply проведет инициализацию по протоколу MCP, запросит \`tools/list\` и сразу покажет все доступные инструменты в карточке и подключит их к ИИ-агенту.
-
----
-
-### 5. Автоматическое создание и подключение MCP серверов ИИ-ассистентом
-
-ИИ-ассистент в Zipply может **самостоятельно создать, скомпилировать и подключить MCP сервер**, если пользователь попросит об этом в чате (например: *«Создай и подключи MCP сервер для работы с SQLite»* или *«Напиши MCP инструмент для парсинга API»*).
-
-#### Алгоритм действий для ИИ-ассистента:
-1. **Создание файлов**: Создать директорию сервера (например, \`.mcp/server-name\` в проекте) и сгенерировать \`package.json\`, \`tsconfig.json\` и \`src/index.ts\` (или \`server.py\`).
-2. **Установка зависимостей и сборка**: Выполнить через терминал установку (\`npm install @modelcontextprotocol/sdk zod && npm run build\` или \`pip install mcp\`).
-3. **Регистрация в Zipply**:
-   - ИИ может автоматически обновить файл конфигурации MCP-серверов в Zipply или предоставить готовый JSON для импорта в разделе **MCP** (<kbd>Ctrl+4</kbd>).
-4. **Готово**: Сервер сразу активируется, а новые инструменты станут доступны агенту в диалоге.
-`
-        fs.writeFileSync(mcpBuilderPath, mcpSkillContent, 'utf-8')
+      if (shouldUpdate) {
+        try {
+          fs.writeFileSync(versionFile, String(DEFAULT_SKILLS_VERSION), 'utf-8')
+        } catch {}
       }
     } catch (e) {
       console.warn('[SkillService] Failed to seed default skills:', e)
@@ -638,7 +531,8 @@ if __name__ == "__main__":
   private static _parseSkillPath(
     targetPath: string,
     isCore: boolean,
-    source: SkillSourceType
+    source: SkillSourceType,
+    subCategory?: string
   ): SkillItem | null {
     try {
       if (!fs.existsSync(targetPath)) return null
@@ -718,6 +612,62 @@ if __name__ == "__main__":
       const disabledSet = this.getDisabledSkills()
       const isSkillDisabled = disabledSet.has(name.toLowerCase()) || disabledSet.has(id.toLowerCase())
 
+      // Resolve category
+      let category = ''
+      const lowerName = name.toLowerCase()
+      const lowerTags = tags.map((t) => t.toLowerCase())
+
+      if (typeof metadata.category === 'string' && metadata.category.trim()) {
+        category = metadata.category.trim().toLowerCase()
+      } else if (source === 'codex') {
+        category = 'codex'
+      } else if (source === 'workspace') {
+        category = 'workspace'
+      } else if (subCategory && typeof subCategory === 'string' && subCategory.trim()) {
+        category = subCategory.trim().toLowerCase()
+      } else if (
+        lowerName.startsWith('tool-') ||
+        lowerName.startsWith('tools-') ||
+        lowerTags.includes('tools') ||
+        lowerTags.includes('tool')
+      ) {
+        category = 'tools'
+      } else if (
+        [
+          'when-stuck',
+          'systematic-debugging',
+          'web-research-troubleshooting',
+          'skills-continuous-evolution',
+          'chat-history-reflection'
+        ].includes(lowerName) ||
+        lowerTags.includes('system')
+      ) {
+        category = 'system'
+      } else if (
+        [
+          'test-driven-development',
+          'frontend-modern-web',
+          'backend-api-architecture',
+          'database-migrations-sql',
+          'performance-profiling',
+          'code-standards',
+          'git-workflows',
+          'docker-management',
+          'mcp-builder'
+        ].includes(lowerName) ||
+        lowerTags.includes('engineering') ||
+        lowerTags.includes('code') ||
+        lowerTags.includes('architecture')
+      ) {
+        category = 'engineering'
+      } else if (effectiveIsCore) {
+        category = 'system'
+      } else {
+        category = 'custom'
+      }
+
+      const meta = this.getCategoryMeta(category)
+
       return {
         id,
         name,
@@ -734,7 +684,10 @@ if __name__ == "__main__":
         filePath: targetPath,
         isFolder,
         files: isFolder ? files : undefined,
-        enabled: !isSkillDisabled
+        enabled: !isSkillDisabled,
+        category,
+        categoryLabel: meta.label,
+        categoryIcon: meta.icon
       }
     } catch (err) {
       console.warn(`[SkillService] Error parsing skill path ${targetPath}:`, err)
@@ -745,7 +698,8 @@ if __name__ == "__main__":
   private static _scanDirectory(
     dirPath: string,
     isCore: boolean,
-    source: SkillSourceType
+    source: SkillSourceType,
+    subCategory?: string
   ): SkillItem[] {
     const results: SkillItem[] = []
     if (!fs.existsSync(dirPath)) return results
@@ -758,13 +712,24 @@ if __name__ == "__main__":
         const fullPath = path.join(dirPath, entry.name)
 
         if (entry.isDirectory()) {
-          const item = this._parseSkillPath(fullPath, isCore, source)
-          if (item) results.push(item)
+          const isSingleSkillDir =
+            fs.existsSync(path.join(fullPath, 'SKILL.md')) ||
+            fs.existsSync(path.join(fullPath, 'skill.md')) ||
+            fs.existsSync(path.join(fullPath, 'README.md'))
+
+          if (isSingleSkillDir) {
+            const item = this._parseSkillPath(fullPath, isCore, source, subCategory)
+            if (item) results.push(item)
+          } else if (!subCategory) {
+            // It's a category subfolder (e.g. tools, system, engineering, custom)
+            const subItems = this._scanDirectory(fullPath, isCore, source, entry.name)
+            results.push(...subItems)
+          }
         } else if (
           entry.isFile() &&
           (entry.name.endsWith('.md') || entry.name.endsWith('.mdc'))
         ) {
-          const item = this._parseSkillPath(fullPath, isCore, source)
+          const item = this._parseSkillPath(fullPath, isCore, source, subCategory)
           if (item) results.push(item)
         }
       }
@@ -1027,7 +992,7 @@ if __name__ == "__main__":
     query: string = '',
     options: {
       workspacePath?: string
-      filterType?: 'all' | 'core' | 'extra' | 'workspace' | 'external'
+      filterType?: string
       embeddingConfig?: EmbeddingConfig
       limit?: number
     } = {}
@@ -1035,11 +1000,12 @@ if __name__ == "__main__":
     const allSkills = this.getAllSkills(options.workspacePath)
     let filtered = allSkills
 
-    const filter = options.filterType || 'all'
+    const filter = (options.filterType || 'all').toLowerCase().trim()
     if (filter === 'core') filtered = filtered.filter((s) => s.isCore)
     else if (filter === 'extra') filtered = filtered.filter((s) => !s.isCore)
-    else if (filter === 'workspace') filtered = filtered.filter((s) => s.source === 'workspace')
-    else if (filter === 'external') filtered = filtered.filter((s) => s.source === 'codex')
+    else if (filter === 'workspace') filtered = filtered.filter((s) => s.source === 'workspace' || s.category === 'workspace')
+    else if (filter === 'external' || filter === 'codex') filtered = filtered.filter((s) => s.source === 'codex' || s.category === 'codex')
+    else if (filter !== 'all') filtered = filtered.filter((s) => (s.category || '').toLowerCase() === filter)
 
     const cleanQuery = query.trim()
     if (!cleanQuery) {
@@ -1132,6 +1098,31 @@ if __name__ == "__main__":
           }
         }
 
+        // Domain concept expansion for common high-impact skills:
+        const isAppCreation = /(?:^|[^a-zа-яё0-9])(соцсеть|твиттер|twitter|мессенджер|чат|сайт|сервис|веб|портал|магазин|платформ|fullstack|бэкенд|фронтенд|приложени)(?:$|[^a-zа-яё0-9])/iu.test(queryLower)
+        if (isAppCreation) {
+          if (nameLower.includes('frontend-modern-web') || nameLower.includes('backend-api-architecture')) {
+            lexicalScore += 16
+            if (!matchReason) matchReason = 'Разработка веб-сервиса / приложения'
+          }
+        }
+
+        const isTrouble = /(?:^|[^a-zа-яё0-9])(запутался|тупик|не получается|по кругу|одно и то же|херн|фигн|не работает|застрял|долго)(?:$|[^a-zа-яё0-9])/iu.test(queryLower)
+        if (isTrouble && nameLower.includes('when-stuck')) {
+          lexicalScore += 18
+          if (!matchReason) matchReason = 'Помощь при затруднениях / выходе из тупика'
+        }
+
+        // Category match bonus
+        if (skill.category && queryLower.includes(skill.category.toLowerCase())) {
+          lexicalScore += 8
+          if (!matchReason) matchReason = `Раздел: ${skill.categoryLabel || skill.category}`
+        }
+        if (skill.categoryLabel && queryLower.includes(skill.categoryLabel.toLowerCase())) {
+          lexicalScore += 8
+          if (!matchReason) matchReason = `Раздел: ${skill.categoryLabel}`
+        }
+
         const jaccard = this._jaccardSimilarity(cleanQuery, `${skill.name} ${skill.description}`)
 
         if (matchedTriggers.length > 0) {
@@ -1170,6 +1161,7 @@ if __name__ == "__main__":
 
   /**
    * Deterministic, Prefix-Stable Extra Skills Catalog for System Prompt.
+   * Grouped into a semantic ontology by sections/categories.
    * Enables optimal LLM Prompt Caching across conversational turns.
    */
   static getStableSkillsCatalogPrompt(workspacePath: string = ''): string {
@@ -1177,34 +1169,69 @@ if __name__ == "__main__":
     const extraSkills = allSkills.filter((s) => !s.isCore && s.enabled !== false)
     if (extraSkills.length === 0) return ''
 
-    // Deterministic sort by name ensures the system prompt prefix remains 100% cache-stable
-    extraSkills.sort((a, b) => a.name.localeCompare(b.name))
+    // Group skills by category
+    const catMap = new Map<string, { label: string; skills: SkillItem[] }>()
 
-    const catalogEntries: string[] = []
     for (const skill of extraSkills) {
-      const attrList: string[] = [`name="${skill.name}"`, `desc="${skill.description.replace(/"/g, "'")}"`]
-      if (skill.triggers && skill.triggers.length > 0) {
-        attrList.push(`triggers="${skill.triggers.slice(0, 4).join(', ')}"`)
+      const catKey = skill.category || 'custom'
+      if (!catMap.has(catKey)) {
+        catMap.set(catKey, {
+          label: skill.categoryLabel || this.getCategoryMeta(catKey).label,
+          skills: []
+        })
       }
-      if (skill.globs && skill.globs.length > 0) {
-        attrList.push(`globs="${skill.globs.slice(0, 3).join(', ')}"`)
-      }
-      if (skill.source && skill.source !== 'global') {
-        attrList.push(`source="${skill.source}"`)
-      }
-      if (skill.files && skill.files.length > 0) {
-        attrList.push(`files="${skill.files.slice(0, 3).join(', ')}"`)
-      }
-      catalogEntries.push(`  <skill ${attrList.join(' ')}/>`)
+      catMap.get(catKey)!.skills.push(skill)
     }
 
-    if (catalogEntries.length === 0) return ''
+    // Deterministic category order
+    const priority = ['system', 'tools', 'engineering', 'workspace', 'codex', 'claude', 'custom']
+    const sortedCats = Array.from(catMap.entries()).sort(([a], [b]) => {
+      const idxA = priority.indexOf(a)
+      const idxB = priority.indexOf(b)
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB
+      if (idxA !== -1) return -1
+      if (idxB !== -1) return 1
+      return a.localeCompare(b)
+    })
 
-    return `\n\n=== КАТАЛОГ ДОПОЛНИТЕЛЬНЫХ НАВЫКОВ (По требованию) ===
-Если задача требует специфических знаний или правил из списка ниже, вызови инструмент \`read_skill(skill_name)\` ПЕРЕД выполнением:
+    const categoryBlocks: string[] = []
+
+    for (const [catKey, catData] of sortedCats) {
+      const skillLines: string[] = []
+      catData.skills.sort((a, b) => a.name.localeCompare(b.name))
+      for (const skill of catData.skills) {
+        const attrs: string[] = [
+          `name="${skill.name}"`,
+          `desc="${skill.description.replace(/"/g, "'")}"`
+        ]
+        if (skill.triggers && skill.triggers.length > 0) {
+          attrs.push(`triggers="${skill.triggers.slice(0, 4).join(', ')}"`)
+        }
+        if (skill.globs && skill.globs.length > 0) {
+          attrs.push(`globs="${skill.globs.slice(0, 3).join(', ')}"`)
+        }
+        if (skill.source && skill.source !== 'global') {
+          attrs.push(`source="${skill.source}"`)
+        }
+        if (skill.files && skill.files.length > 0) {
+          attrs.push(`files="${skill.files.slice(0, 3).join(', ')}"`)
+        }
+        skillLines.push(`    <skill ${attrs.join(' ')}/>`)
+      }
+      categoryBlocks.push(`  <category id="${catKey}" title="${catData.label}">\n${skillLines.join('\n')}\n  </category>`)
+    }
+
+    return `\n\n=== КАТАЛОГ НАВЫКОВ ПО РАЗДЕЛАМ (Онтология знаний Zipply) ===
+У тебя есть встроенная библиотека проверенных инженерных руководств, правил и инструментов.
+Ты ОБЯЗАНА использовать навыки перед выполнением сложных задач или при возникновении трудностей:
 <available_skills>
-${catalogEntries.join('\n')}
-</available_skills>`
+<skills_ontology>
+${categoryBlocks.join('\n')}
+</skills_ontology>
+</available_skills>
+Для изучения любого навыка вызови: \`read_skill(skill_name="...")\`.
+Для поиска по ключевым словам или теме вызови: \`search_skills(query="...")\`.
+Для просмотра всех навыков раздела вызови: \`list_skills(category="...")\`.`
   }
 
   /**
@@ -1548,14 +1575,25 @@ ${catalogEntries.join('\n')}
     const safeName = this.sanitizeSkillName(name)
     let deleted = false
 
-    // If direct sourcePath is provided
-    if (sourcePath && fs.existsSync(sourcePath)) {
+    // If direct sourcePath is provided or found in library
+    let targetFileOrDir = sourcePath
+    if (!targetFileOrDir) {
+      const all = this.getAllSkills()
+      const found = all.find(
+        (s) => s.name.toLowerCase() === name.toLowerCase() || this.sanitizeSkillName(s.name) === safeName
+      )
+      if (found && found.filePath) {
+        targetFileOrDir = found.filePath
+      }
+    }
+
+    if (targetFileOrDir && fs.existsSync(targetFileOrDir)) {
       try {
-        const stats = fs.statSync(sourcePath)
+        const stats = fs.statSync(targetFileOrDir)
         if (stats.isDirectory()) {
-          fs.rmSync(sourcePath, { recursive: true, force: true })
+          fs.rmSync(targetFileOrDir, { recursive: true, force: true })
         } else {
-          fs.unlinkSync(sourcePath)
+          fs.unlinkSync(targetFileOrDir)
         }
         return { success: true }
       } catch (e: any) {
@@ -1609,12 +1647,59 @@ ${catalogEntries.join('\n')}
     this.init()
     const safeName = this.sanitizeSkillName(name)
 
+    let resolvedPath = sourcePath
+    if (!resolvedPath) {
+      const all = this.getAllSkills()
+      const found = all.find(
+        (s) => s.name.toLowerCase() === name.toLowerCase() || this.sanitizeSkillName(s.name) === safeName
+      )
+      if (found && found.filePath) {
+        resolvedPath = found.filePath
+      }
+    }
+
     const corePath = path.join(this.getCoreDir(), `${safeName}.md`)
     const extraPath = path.join(this.getExtraDir(), `${safeName}.md`)
     const coreFolder = path.join(this.getCoreDir(), safeName)
     const extraFolder = path.join(this.getExtraDir(), safeName)
 
     try {
+      // 1. Direct path resolution if file is in a category subfolder or core
+      if (resolvedPath && fs.existsSync(resolvedPath)) {
+        const stats = fs.statSync(resolvedPath)
+        const isCurrentlyInCore = resolvedPath.replace(/\\/g, '/').includes('/skills/core')
+
+        if (isCurrentlyInCore) {
+          // Move from Core to Extra (custom subfolder)
+          const targetExtraDir = path.join(this.getExtraDir(), 'custom')
+          if (!fs.existsSync(targetExtraDir)) fs.mkdirSync(targetExtraDir, { recursive: true })
+
+          if (stats.isDirectory()) {
+            const dest = path.join(targetExtraDir, safeName)
+            fs.cpSync(resolvedPath, dest, { recursive: true })
+            fs.rmSync(resolvedPath, { recursive: true, force: true })
+          } else {
+            const dest = path.join(targetExtraDir, `${safeName}.md`)
+            fs.copyFileSync(resolvedPath, dest)
+            fs.unlinkSync(resolvedPath)
+          }
+          return { success: true, newIsCore: false }
+        } else if (resolvedPath.replace(/\\/g, '/').includes('/skills/extra')) {
+          // Move from Extra to Core
+          const targetCoreDir = this.getCoreDir()
+          if (stats.isDirectory()) {
+            const dest = path.join(targetCoreDir, safeName)
+            fs.cpSync(resolvedPath, dest, { recursive: true })
+            fs.rmSync(resolvedPath, { recursive: true, force: true })
+          } else {
+            const dest = path.join(targetCoreDir, `${safeName}.md`)
+            fs.copyFileSync(resolvedPath, dest)
+            fs.unlinkSync(resolvedPath)
+          }
+          return { success: true, newIsCore: true }
+        }
+      }
+
       // 1. Single file in Core -> Move to Extra
       if (fs.existsSync(corePath)) {
         const content = fs.readFileSync(corePath, 'utf-8')

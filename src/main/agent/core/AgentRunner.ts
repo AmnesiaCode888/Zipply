@@ -86,6 +86,9 @@ export class AgentRunner {
     blackboard.setArtifact('tavilyKey', config.tavilyKey || process.env.TAVILY_API_KEY || '')
     blackboard.setArtifact('searchProvider', config.searchProvider || 'duckduckgo')
     blackboard.setArtifact('config', config)
+    if (config.chatId) {
+      blackboard.setArtifact('chatId', config.chatId)
+    }
 
     const embeddingConfig = {
       baseUrl: config.baseUrl,
@@ -321,15 +324,30 @@ export class AgentRunner {
         const resultStr = typeof resultMsg?.content === 'string' ? resultMsg.content : ''
         const isError = resultStr.toLowerCase().startsWith('[error') || resultStr.toLowerCase().startsWith('error:')
 
-        // Summary: prefer description arg (agent fills this), else tool name
+        const toolName = toolCall.name
+        const action = typeof args.action === 'string' ? args.action : undefined
+        const target = typeof args.path === 'string'
+          ? args.path
+          : typeof args.file === 'string'
+            ? args.file
+            : typeof args.command === 'string'
+              ? args.command
+              : typeof args.skill_name === 'string'
+                ? args.skill_name
+                : undefined
+
+        // Summary: prefer description arg (agent fills this), else tool name + action
         const summary = (typeof args.description === 'string' && args.description.trim())
           ? args.description.trim()
-          : toolCall.name
+          : (action ? `${toolName}:${action}` : toolName)
 
         toolLog.push({
           summary,
           error: isError,
-          resultSnippet: resultStr.slice(0, 120)
+          resultSnippet: resultStr.slice(0, 120),
+          toolName,
+          action,
+          target
         })
       }
 
@@ -349,6 +367,16 @@ export class AgentRunner {
         })
         messages.push({ role: 'user', content: `[WATCHDOG 🛑 DIRECTIVE] ${instantVerdict.message}` })
         continue
+      } else if (instantVerdict.status === 'warn' && !abortSignal?.aborted && !loopDone && watchdogCooldown <= 0) {
+        toolCallsSinceLastCheck = 0
+        watchdogCooldown = 4
+        safeEmit({
+          type: 'watchdog',
+          status: 'warn',
+          message: instantVerdict.message,
+          toolCount: toolLog.length
+        })
+        messages.push({ role: 'user', content: `[WATCHDOG ⚠️ HINT] ${instantVerdict.message}` })
       }
 
       // ── Adaptive Interval Calculation ────────────────────────────────────
@@ -368,11 +396,23 @@ export class AgentRunner {
           t.resultSnippet.length > 20 &&
           recentTools.filter((other) => other.resultSnippet === t.resultSnippet).length >= 3
       )
+      const hasRepeatedTargets = recentTools.some(
+        (t) => t.target && recentTools.filter((other) => other.target === t.target).length >= 3
+      )
+      // Passive inspection operations (file reading, searching) do NOT count as productive work
+      const isPurelyPassive = recentTools.every(
+        (t) =>
+          (t.toolName === 'file' && (t.action === 'read' || !t.action || t.action === 'read_tree')) ||
+          t.toolName === 'read_page' ||
+          t.toolName === 'grep_search'
+      )
       const recentAllSuccess =
         recentTools.length >= 4 &&
         recentTools.every((e) => !e.error) &&
         !hasRepeatedSummaries &&
-        !hasRepeatedSnippets
+        !hasRepeatedSnippets &&
+        !hasRepeatedTargets &&
+        !isPurelyPassive
 
       if (shouldCheck && !recentAllSuccess) {
         toolCallsSinceLastCheck = 0

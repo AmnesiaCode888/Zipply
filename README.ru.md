@@ -23,11 +23,11 @@
   </p>
 
   <p>
-    <a href="https://github.com/AmnesiaCode888/Zipply/releases/download/v0.4.0-beta/Zipply-0.4.0-win-x64.exe">
+    <a href="https://github.com/AmnesiaCode888/Zipply/releases/download/v0.5.0-beta/Zipply-0.5.0-win-x64.exe">
       <img src="https://img.shields.io/badge/Скачать_для_Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Скачать для Windows" />
     </a>
     &nbsp;
-    <a href="https://github.com/AmnesiaCode888/Zipply/releases/download/v0.4.0-beta/Zipply-0.4.0-linux-x86_64.AppImage">
+    <a href="https://github.com/AmnesiaCode888/Zipply/releases/download/v0.5.0-beta/Zipply-0.5.0-linux-x86_64.AppImage">
       <img src="https://img.shields.io/badge/Скачать_для_Linux-1E293B?style=for-the-badge&logo=linux&logoColor=white" alt="Скачать для Linux" />
     </a>
   </p>
@@ -91,10 +91,27 @@ Zipply координирует специализированных агент�
 * Импорт конфигов серверов из Cursor, Claude Desktop и Antigravity в один клик.
 * Управление статусом серверов, переменными окружения и правами доступа прямо в приложении.
 
+### <img src="resources/icons/blue/bot.svg" width="18" height="18" /> Удалённое управление через Telegram-бота
+* Полноценное управление агентом Zipply из любого места через официальный Telegram Bot API.
+* Стриминг хода решения задачи, отображение шагов инструментов с эмодзи и уведомления о завершении.
+* Выбор, поиск и переключение моделей прямо в мессенджере с помощью команды `/model`.
+* Строгая авторизация по белому списку ID пользователей для абсолютной безопасности.
+
+### <img src="resources/icons/blue/globe.svg" width="18" height="18" /> Встроенный браузер и автоматизация веб-среды
+* Интегрированный браузер на базе `<webview>` в боковой панели с авто-обходом заголовков CORS/CSP.
+* Действия агента: навигация, клики, ввод текста, скролл, запуск JavaScript и парсинг DOM.
+* Пошаговый визуальный мониторинг с созданием скриншотов и индикацией загрузки.
+
 ### <img src="resources/icons/blue/sparkles.svg" width="18" height="18" /> Динамическая система навыков (Skills)
-* Навыки на основе Markdown с фронтматтером условий запуска и строгими директивами.
-* Семантический векторный поиск (эмбеддинги) для релевантной активации навыков по контексту задачи.
-* Встроенный редактор навыков с подсветкой синтаксиса и валидацией схем.
+* 23 встроенных инженерных и когнитивных навыка с фронтматтером условий запуска.
+* Шлюз обязательного применения (Turn-1 Auto-Enforcement Gate) до начала изменения файлов.
+* Автоматическая онтология и векторный семантический поиск по триггерам.
+* Редактор навыков в UI с валидацией, импортом/экспортом и передачей в Codex.
+
+### <img src="resources/icons/blue/terminal.svg" width="18" height="18" /> Мульти-чат стриминг и изоляция сессий
+* Параллельная генерация в нескольких диалогах без смешивания токенов.
+* Независимая отмена генерации в отдельном чате без прерывания других потоков.
+* Единая лента активности с интерактивным просмотром диффов кода и деревом проекта.
 
 ### <img src="resources/icons/blue/brain.svg" width="18" height="18" /> Долгосрочная память и Blackboard
 * Тематическое разрешение конфликтов: новые решения архитектора автоматически замещают устаревшие предположения.
@@ -107,17 +124,18 @@ Zipply координирует специализированных агент�
 
 ---
 
-## <img src="resources/icons/blue/download.svg" width="22" height="22" /> Готовые сборки (v0.4.0-beta)
+## <img src="resources/icons/blue/download.svg" width="22" height="22" /> Готовые сборки (v0.5.0-beta)
 
 | Платформа | Формат | Архитектура | Прямая ссылка |
 | :--- | :--- | :--- | :--- |
-| **Windows** | Установщик NSIS (`.exe`) | x64 | [`Zipply-0.4.0-win-x64.exe`](https://github.com/AmnesiaCode888/Zipply/releases/download/v0.4.0-beta/Zipply-0.4.0-win-x64.exe) |
-| **Linux (Портативный)** | AppImage | x86_64 | [`Zipply-0.4.0-linux-x86_64.AppImage`](https://github.com/AmnesiaCode888/Zipply/releases/download/v0.4.0-beta/Zipply-0.4.0-linux-x86_64.AppImage) |
-| **Debian / Ubuntu** | Пакет (`.deb`) | amd64 | [`zipply-0.4.0-linux-amd64.deb`](https://github.com/AmnesiaCode888/Zipply/releases/download/v0.4.0-beta/zipply-0.4.0-linux-amd64.deb) |
-| **Void Linux** | Пакет (`.xbps`) | x86_64 | [`zipply-0.4.0_1.x86_64.xbps`](https://github.com/AmnesiaCode888/Zipply/releases/download/v0.4.0-beta/zipply-0.4.0_1.x86_64.xbps) |
+| **Windows** | Установщик NSIS (`.exe`) | x64 | [`Zipply-0.5.0-win-x64.exe`](https://github.com/AmnesiaCode888/Zipply/releases/download/v0.5.0-beta/Zipply-0.5.0-win-x64.exe) |
+| **Linux (Портативный)** | AppImage | x86_64 | [`Zipply-0.5.0-linux-x86_64.AppImage`](https://github.com/AmnesiaCode888/Zipply/releases/download/v0.5.0-beta/Zipply-0.5.0-linux-x86_64.AppImage) |
+| **Debian / Ubuntu** | Пакет (`.deb`) | amd64 | [`zipply-0.5.0-linux-amd64.deb`](https://github.com/AmnesiaCode888/Zipply/releases/download/v0.5.0-beta/zipply-0.5.0-linux-amd64.deb) |
+| **Void Linux** | Пакет (`.xbps`) | x86_64 | [`zipply-0.5.0_1.x86_64.xbps`](https://github.com/AmnesiaCode888/Zipply/releases/download/v0.5.0-beta/zipply-0.5.0_1.x86_64.xbps) |
+| **Arch Linux** | Пакет (`.pkg.tar.zst`) | x86_64 | [`zipply-0.5.0-1-x86_64.pkg.tar.zst`](https://github.com/AmnesiaCode888/Zipply/releases/download/v0.5.0-beta/zipply-0.5.0-1-x86_64.pkg.tar.zst) |
 
 > [!TIP]
-> Все установочные пакеты, контрольные суммы SHA256 и список изменений доступны на вкладке [GitHub Releases](https://github.com/AmnesiaCode888/Zipply/releases).
+> Все установочные пакеты, контрольные суммы SHA256, PKGBUILD для AUR и список изменений доступны на вкладке [GitHub Releases](https://github.com/AmnesiaCode888/Zipply/releases).
 
 ---
 
@@ -149,6 +167,7 @@ npm run build:win       # Windows NSIS (.exe)
 npm run build:appimage  # Linux AppImage
 npm run build:deb       # Debian / Ubuntu (.deb)
 npm run build:xbps      # Void Linux (.xbps)
+npm run build:pacman    # Arch Linux (.pkg.tar.zst)
 npm run build:all       # Сборка под все поддерживаемые ОС
 ```
 

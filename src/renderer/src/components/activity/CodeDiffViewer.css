@@ -1,0 +1,285 @@
+﻿/* ─── CodeDiffViewer: Zipply Minimalist Gray Design ─── */
+.code-viewer-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background-color: var(--code-bg, #0E0E10);
+  color: var(--code-text, #D4D4D8);
+  font-family: var(--font-mono, 'JetBrains Mono', Consolas, monospace);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* ─── Minimal Header (35px) ─── */
+.code-viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px 0 8px;
+  height: 35px;
+  min-height: 35px;
+  background-color: var(--bg-sidebar, #121212);
+  border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+  gap: 6px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  font-family: var(--font-custom-family, 'Inter Variable', 'Inter', sans-serif);
+}
+
+.code-viewer-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.code-viewer-back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #858585);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.code-viewer-back-btn:hover {
+  background-color: var(--btn-bg-hover, rgba(255, 255, 255, 0.08));
+  color: var(--text-primary, #FFFFFF);
+}
+
+.code-viewer-file-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.code-viewer-file-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-primary, #FFFFFF);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.code-viewer-file-path {
+  font-size: 11px;
+  color: var(--text-muted, #71717A);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.code-viewer-header-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.code-viewer-mode-switch {
+  display: flex;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px;
+  border-radius: 4px;
+  gap: 1px;
+}
+
+.code-viewer-mode-btn {
+  padding: 2px 6px;
+  font-size: 10.5px;
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: 3px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #858585);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  line-height: 1.2;
+}
+
+.code-viewer-mode-btn.active {
+  background: var(--btn-bg-hover, rgba(255, 255, 255, 0.12));
+  color: #FFFFFF;
+}
+
+.code-viewer-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #858585);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  padding: 0;
+}
+
+.code-viewer-btn:hover {
+  background-color: var(--btn-bg-hover, rgba(255, 255, 255, 0.08));
+  color: var(--text-primary, #FFFFFF);
+}
+
+.code-viewer-diff-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.code-viewer-diff-badge .stat-add {
+  color: #27C93F;
+}
+
+.code-viewer-diff-badge .stat-del {
+  color: #FF5F56;
+}
+
+/* ─── Code Viewport ─── */
+.code-viewer-body {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+  background: var(--code-bg, #0E0E10);
+}
+
+.code-viewer-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 19px;
+  font-family: var(--font-mono, 'JetBrains Mono', Consolas, monospace);
+}
+
+.code-viewer-row {
+  min-height: 19px;
+}
+
+.code-viewer-row.row-add {
+  background: rgba(39, 201, 63, 0.08);
+}
+
+.code-viewer-row.row-del {
+  background: rgba(255, 95, 86, 0.08);
+}
+
+.code-viewer-gutter {
+  user-select: none;
+  text-align: right;
+  padding: 0 8px;
+  color: var(--text-muted, #666666);
+  width: 38px;
+  vertical-align: top;
+  border-right: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.05));
+  font-size: 11px;
+}
+
+.code-viewer-gutter.gutter-diff {
+  width: 28px;
+  padding: 0 4px;
+}
+
+.code-viewer-gutter-symbol {
+  user-select: none;
+  text-align: center;
+  width: 14px;
+  padding: 0 1px;
+  vertical-align: top;
+  font-weight: bold;
+  font-size: 11px;
+}
+
+.row-add .code-viewer-gutter-symbol {
+  color: #27C93F;
+}
+
+.row-del .code-viewer-gutter-symbol {
+  color: #FF5F56;
+}
+
+.code-viewer-content {
+  padding: 0 10px;
+  white-space: pre;
+  vertical-align: top;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+.code-viewer-empty-line {
+  display: inline-block;
+  min-height: 19px;
+}
+
+/* VS Code Dark+ / JetBrains Mono Syntax */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #6a9955;
+}
+
+.token.punctuation {
+  color: #888888;
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #b5cea8;
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #ce9178;
+}
+
+.token.operator,
+.token.entity,
+.token.url {
+  color: #d4d4d4;
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #569cd6;
+}
+
+.token.function,
+.token.class-name {
+  color: #dcdcaa;
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+  color: #9cdcfe;
+}

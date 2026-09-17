@@ -345,29 +345,29 @@
 /* Light Studio */
 [data-theme="light"] {
   --bg-primary: #F4F5F8;
-  --bg-sidebar: #ECEEF2;
+  --bg-sidebar: #EAECEF;
   --bg-surface: #FFFFFF;
   --bg-surface-hover: #F1F3F7;
-  --bg-surface-active: #E4E7ED;
-  --border-card: #E2E4E9;
+  --bg-surface-active: #E2E5EB;
+  --border-card: #D8DCE3;
   --border-subtle: rgba(0, 0, 0, 0.08);
-  --border-hover: rgba(0, 0, 0, 0.16);
+  --border-hover: rgba(0, 0, 0, 0.18);
   --text-primary: #111827;
-  --text-secondary: #4B5563;
-  --text-muted: #8E96A3;
+  --text-secondary: #374151;
+  --text-muted: #64748B;
   --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.06);
 
-  --btn-bg: rgba(0, 0, 0, 0.06);
-  --btn-bg-hover: rgba(0, 0, 0, 0.1);
-  --btn-bg-active: rgba(0, 0, 0, 0.15);
+  --btn-bg: rgba(0, 0, 0, 0.05);
+  --btn-bg-hover: rgba(0, 0, 0, 0.09);
+  --btn-bg-active: rgba(0, 0, 0, 0.14);
   --btn-text: #111827;
   --btn-primary-bg: #18181B;
   --btn-primary-text: #FFFFFF;
   --btn-primary-hover-bg: #27272A;
   --btn-primary-hover-text: #FFFFFF;
 
-  --user-bubble-bg: #E8EAEF;
-  --user-bubble-border: #D8DCE4;
+  --user-bubble-bg: #E3E6EC;
+  --user-bubble-border: #D1D5DB;
   --user-bubble-text: #111827;
 
   --card-bg: rgba(0, 0, 0, 0.035);
@@ -375,18 +375,27 @@
   --card-bg-active: rgba(0, 0, 0, 0.095);
   --pill-bg: rgba(0, 0, 0, 0.05);
   --pill-bg-hover: rgba(0, 0, 0, 0.09);
-  --pill-text: #374151;
+  --pill-text: #1F2937;
   --input-bg: rgba(0, 0, 0, 0.035);
   --input-bg-hover: rgba(0, 0, 0, 0.055);
   --input-bg-focus: rgba(0, 0, 0, 0.075);
-  --input-border: rgba(0, 0, 0, 0.1);
-  --input-border-focus: rgba(0, 0, 0, 0.25);
-  --input-placeholder: rgba(0, 0, 0, 0.4);
+  --input-border: rgba(0, 0, 0, 0.12);
+  --input-border-focus: rgba(0, 0, 0, 0.28);
+  --input-placeholder: rgba(0, 0, 0, 0.45);
 
   --code-bg: #F8F9FA;
   --code-header-bg: #EEF0F4;
-  --code-border: #E2E4E9;
+  --code-border: #D8DCE3;
   --code-text: #1F2937;
+
+  /* Default accent values for light theme */
+  --accent-primary: #18181B;
+  --accent-hover: #27272A;
+  --accent-light: rgba(24, 24, 27, 0.08);
+  --accent-glow: rgba(24, 24, 27, 0.15);
+  --accent-text: #18181B;
+  --accent-rgb: 24, 24, 27;
+  --accent-contrast: #FFFFFF;
 }
 
 /* Custom Theme — driven by CSS custom properties set inline by JS */
@@ -735,7 +744,7 @@ body,
   flex-direction: column;
   flex: 1;
   height: 100vh;
-  min-width: 380px;
+  min-width: 280px;
   overflow: hidden;
   background-color: var(--bg-primary);
 }
@@ -794,5 +803,18 @@ body,
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted, rgba(255, 255, 255, 0.25));
+}
+
+[data-theme="light"] ::selection {
+  background-color: rgba(37, 99, 235, 0.18);
+  color: #111827;
+}
+
+[data-theme="light"] .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.28);
 }
 

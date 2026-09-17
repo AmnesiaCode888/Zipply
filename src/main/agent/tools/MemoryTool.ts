@@ -1,8 +1,9 @@
 import { ToolBase, ToolParameterDef, ToolResult } from './ToolBase'
 import { MemoryService } from '../services/MemoryService'
+import { SessionSummaryService } from '../services/SessionSummaryService'
 
 /**
- * MemoryTool — Allows zipply agent to save, update, search, list, and delete long-term memories.
+ * MemoryTool — Allows zipply agent to save, update, search, list, delete memories, and inspect past chat sessions.
  *
  * Strict save policy: Only save information with genuine long-term value.
  * Use `update` to modify existing entries instead of creating duplicates.
@@ -13,7 +14,7 @@ export class MemoryTool extends ToolBase {
   }
 
   get description(): string {
-    return 'Manage long-term memory. Save ONLY high-value facts: user name/role, explicit preferences, project tech stack, ports, rules. Use update to modify existing entries. Do NOT save temporary details, code content, or obvious facts.'
+    return 'Manage long-term memory and inspect past chat sessions. Operations: save (fact), update (by id), search (memories), list (all), delete (by id), sessions (inspect past chats & summaries to learn and improve skills).'
   }
 
   getExecutionPolicy(args: Record<string, unknown> = {}) {
@@ -31,9 +32,9 @@ export class MemoryTool extends ToolBase {
       },
       action: {
         type: 'string',
-        enum: ['save', 'update', 'search', 'list', 'delete'],
+        enum: ['save', 'update', 'search', 'list', 'delete', 'sessions'],
         description:
-          'Operation: save (store new fact/preference), update (modify existing by id), search (find by text), list (by category), delete (by id)',
+          'Operation: save (store new fact/preference), update (modify existing by id), search (find by text), list (by category), delete (by id), sessions (inspect past chat sessions & summaries)',
         required: true
       },
       content: {
@@ -207,6 +208,33 @@ export class MemoryTool extends ToolBase {
         formattedContent: success
           ? `✅ Memory ID "${id}" deleted.`
           : `Error: Memory ID "${id}" not found.`
+      }
+    }
+
+    // --- SESSIONS (Past Chats & Summaries) ---
+    if (action === 'sessions') {
+      const query = content ? String(content).trim() : ''
+      const sessions = query
+        ? SessionSummaryService.getRelevantSummaries(query, 10)
+        : SessionSummaryService.getAllSessions().slice(0, 15)
+
+      if (sessions.length === 0) {
+        return { formattedContent: 'Прошлые сессии чатов не найдены.' }
+      }
+
+      const formatted = sessions.map((s, idx) => {
+        const date = new Date(s.createdAt).toLocaleDateString('ru-RU', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        })
+        const kw = s.keywords && s.keywords.length > 0 ? `\n   Ключевые слова: ${s.keywords.slice(0, 6).join(', ')}` : ''
+        return `${idx + 1}. [${date}] "${s.title}" (ID: ${s.id})\n   Резюме: ${s.summary}${kw}`
+      })
+
+      return {
+        formattedContent: `=== ИСТОРИЯ ПРОШЛЫХ СЕССИЙ (${sessions.length}) ===\n\n${formatted.join('\n\n')}\n\nИспользуй эти данные для учета прошлых ошибок, предпочтений пользователя и обновления навыков через save_skill.`,
+        data: { count: sessions.length, sessions }
       }
     }
 

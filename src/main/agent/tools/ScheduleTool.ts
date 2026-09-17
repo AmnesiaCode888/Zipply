@@ -75,6 +75,13 @@ export class ScheduleTool extends ToolBase {
         description: 'Whether to show native desktop notification when the task completes (default: true)',
         required: false
       },
+      chat_mode: {
+        type: 'string',
+        description:
+          '[For create] Where the task executes: "new_chat" (default, creates a separate new chat session with clock icon 🕐) or "same_chat" (continues inside current chat dialog)',
+        required: false,
+        enum: ['new_chat', 'same_chat']
+      },
       task_id: {
         type: 'string',
         description: '[Required for cancel, pause, resume, get_logs] Target schedule ID (e.g. "sched_171...")',
@@ -101,6 +108,12 @@ export class ScheduleTool extends ToolBase {
       }
 
       const workspace = (blackboard?.getArtifact('workspacePath') as string) || ''
+      const blackboardChatId =
+        (blackboard?.getArtifact('chatId') as string) ||
+        ((blackboard?.getArtifact('config') as any)?.chatId as string) ||
+        undefined
+      const chatMode = args.chat_mode === 'same_chat' ? 'same_chat' : 'new_chat'
+
       const res = SchedulerService.createSchedule({
         type: args.type as ScheduleType,
         delaySeconds: Number(args.delay_seconds) || undefined,
@@ -111,7 +124,9 @@ export class ScheduleTool extends ToolBase {
         workspacePath: workspace,
         maxIterations: Number(args.max_iterations) || undefined,
         notifyOs: args.notify_os !== false,
-        catchUp: args.catch_up === true
+        catchUp: args.catch_up === true,
+        chatMode,
+        chatId: blackboardChatId
       })
 
       if (!res.success || !res.item) {
@@ -121,9 +136,10 @@ export class ScheduleTool extends ToolBase {
       const item = res.item
       const typeLabel = item.type === 'once' ? `One-shot timer (${item.delaySeconds}s delay)` : `Recurring (${item.cronExpression || item.intervalSeconds + 's'})`
       const nextTimeStr = item.nextRunAt ? new Date(item.nextRunAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'N/A'
+      const chatModeLabel = item.chatMode === 'same_chat' ? 'Same Chat Dialog' : 'New Dedicated Chat (🕐)'
 
       return {
-        formattedContent: `✅ Scheduled task created successfully!\n\n• ID: ${item.id}\n• Title: "${item.title}"\n• Type: ${typeLabel}\n• Next run: ${nextTimeStr} (${item.nextRunAt})\n• Prompt: "${item.prompt}"\n• OS Notification: ${item.notifyOs ? 'Enabled' : 'Disabled'}\n\nThe system will automatically wake up and execute this task in the background at the specified time.`,
+        formattedContent: `✅ Scheduled task created successfully!\n\n• ID: ${item.id}\n• Title: "${item.title}"\n• Type: ${typeLabel}\n• Next run: ${nextTimeStr} (${item.nextRunAt})\n• Chat Mode: ${chatModeLabel}\n• Prompt: "${item.prompt}"\n• OS Notification: ${item.notifyOs ? 'Enabled' : 'Disabled'}\n\nThe system will automatically wake up and execute this task in the background at the specified time.`,
         data: item
       }
     }

@@ -10,6 +10,7 @@ import { ReadSkillTool, SaveSkillTool, ListSkillsTool, SearchSkillTool, DeleteSk
 import { ScheduleTool } from './ScheduleTool'
 import { CallMcpTool, ManageMcpTool } from './McpTool'
 import { CompleteTaskTool } from './CompleteTaskTool'
+import { BrowserTool } from './BrowserTool'
 
 /**
  * ToolRegistry — Central registry for all agent tools.
@@ -52,4 +53,5 @@ toolRegistry
   .register(new CallMcpTool())
   .register(new ManageMcpTool())
   .register(new CompleteTaskTool())
+  .register(new BrowserTool())
 

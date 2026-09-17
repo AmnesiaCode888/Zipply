@@ -270,11 +270,12 @@ export class ModelFetcherService {
         }
       }
 
-      // 2. Fallback: minimal chat completion ping if model is provided
+      // 2. Fallback: minimal chat completion or messages ping if model is provided
       if (model) {
-        const chatUrl = rawBaseUrl.endsWith('/chat/completions')
-          ? rawBaseUrl
-          : `${rawBaseUrl}/chat/completions`
+        const isAnthropic = options.providerId === 'anthropic' || rawBaseUrl.includes('anthropic.com')
+        const pingUrl = isAnthropic
+          ? (rawBaseUrl.endsWith('/messages') ? rawBaseUrl : `${rawBaseUrl.replace(/\/v1\/?$/, '')}/v1/messages`)
+          : (rawBaseUrl.endsWith('/chat/completions') ? rawBaseUrl : `${rawBaseUrl}/chat/completions`)
 
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
@@ -284,9 +285,13 @@ export class ModelFetcherService {
         }
         if (apiKey) {
           headers['Authorization'] = `Bearer ${apiKey}`
+          if (isAnthropic) {
+            headers['x-api-key'] = apiKey
+            headers['anthropic-version'] = '2023-06-01'
+          }
         }
 
-        const res = await fetch(chatUrl, {
+        const res = await fetch(pingUrl, {
           method: 'POST',
           headers,
           body: JSON.stringify({

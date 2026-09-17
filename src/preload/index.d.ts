@@ -61,6 +61,13 @@ export interface ElectronAPI {
       Promise<{ success: boolean; enabled: boolean }>
     togglePackage: (skillNames: string[], enabled: boolean) =>
       Promise<{ success: boolean; count: number }>
+    toggleCategory: (category: string, enabled: boolean, workspacePath?: string) =>
+      Promise<{ success: boolean; count: number }>
+    transfer: (
+      items: Array<{ name: string; sourcePath: string; isFolder?: boolean }>,
+      targetCategory?: string,
+      isCore?: boolean
+    ) => Promise<{ success: boolean; count: number; error?: string }>
     deleteMultiple: (items: Array<{ name: string; isCore?: boolean; sourcePath?: string }>) =>
       Promise<{ success: boolean; deletedCount: number }>
     openFolder: () => Promise<{ success: boolean; path: string; error?: string }>
@@ -75,6 +82,11 @@ export interface ElectronAPI {
     pause: (id: string) => Promise<boolean>
     resume: (id: string) => Promise<boolean>
     trigger: (id: string) => Promise<{ success: boolean; message: string }>
+    onChatCreated: (callback: (data: { chat: any }) => void) => () => void
+    onChatUpdated: (callback: (data: { chatId: string; chat: any }) => void) => () => void
+    onSelectChat: (callback: (chatId: string) => void) => () => void
+    onTaskTriggered: (callback: (data: any) => void) => () => void
+    onTaskCompleted: (callback: (data: any) => void) => () => void
   }
   dialog: {
     selectDirectory: (defaultPath?: string) => Promise<string | null>
@@ -142,6 +154,7 @@ export interface ElectronAPI {
     move: (sourcePath: string, targetDirPath: string) => Promise<{ success: boolean; destPath?: string; error?: string }>
     delete: (targetPath: string) => Promise<{ success: boolean; error?: string }>
     reveal: (targetPath: string) => Promise<boolean>
+    readFile: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
   }
   terminal: {
     run: (params: { runId: string; command: string; cwd?: string; sessionId?: string }) => void
@@ -154,6 +167,39 @@ export interface ElectronAPI {
     onAiStart: (callback: (data: { runId: string; command: string; cwd: string; isBackground?: boolean }) => void) => () => void
     onAiData: (callback: (data: { runId: string; text: string }) => void) => () => void
     onAiExit: (callback: (data: { runId: string; code?: number | null }) => void) => () => void
+  }
+  browser: {
+    onAction: (callback: (request: any) => void) => () => void
+    sendResponse: (response: { requestId: string; success: boolean; data?: any; error?: string }) => void
+    openView: (tab?: string) => void
+    onOpenView: (callback: (data?: any) => void) => () => void
+  }
+  telegram: {
+    getConfig: () => Promise<{
+      token: string
+      enabled: boolean
+      allowedUsers: string[]
+      autoStart: boolean
+      defaultWorkspace?: string
+    }>
+    saveConfig: (patch: any) => Promise<any>
+    start: () => Promise<any>
+    stop: () => Promise<void>
+    getStatus: () => Promise<{
+      status: 'stopped' | 'starting' | 'running' | 'error'
+      botInfo?: { id: number; username: string; firstName: string }
+      error?: string
+      lastActiveAt?: string
+    }>
+    testToken: (token: string) => Promise<{
+      valid: boolean
+      botInfo?: { id: number; username: string; firstName: string }
+      error?: string
+    }>
+    onStatus: (callback: (status: any) => void) => () => void
+    notifyActiveChat: (chatId: string | null) => void
+    getModels: () => Promise<Array<{ id: string; name: string }>>
+    setModel: (model: string) => Promise<string>
   }
   setZoomFactor: (factor: number) => void
 }

@@ -292,6 +292,16 @@ export function useAppearance() {
         if (parsed.accentColor === 'blue') {
           parsed.accentColor = 'monochrome'
         }
+        const DARK_RESTORE_KEY = 'zipply_theme_dark_restore_v2'
+        if (!localStorage.getItem(DARK_RESTORE_KEY)) {
+          localStorage.setItem(DARK_RESTORE_KEY, 'true')
+          if (parsed.theme === 'midnight') {
+            parsed.theme = 'dark'
+          }
+          const updated: AppearanceConfig = { ...DEFAULT_APPEARANCE, ...parsed, theme: parsed.theme }
+          persistAppearance(updated)
+          return updated
+        }
         return { ...DEFAULT_APPEARANCE, ...parsed }
       }
     } catch (e) {

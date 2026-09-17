@@ -27,6 +27,7 @@ import { WebPageViewer } from './viewers/WebPageViewer'
 import { MemoryViewer } from './viewers/MemoryViewer'
 import { SubagentViewer } from './viewers/SubagentViewer'
 import { McpViewer } from './viewers/McpViewer'
+import { BrowserStepViewer } from './viewers/BrowserStepViewer'
 
 export interface ToolStepViewerProps {
   step: StepItem
@@ -37,6 +38,8 @@ export interface ToolStepViewerProps {
  */
 export function getStepIcon(type: StepType): React.ReactNode {
   switch (type) {
+    case 'browser':
+      return <Globe size={14} className="step-type-icon" style={{ color: '#38BDF8' }} />
     case 'thought':
       return <Brain size={14} className="step-type-icon" />
     case 'edit':
@@ -143,6 +146,41 @@ export function formatStepTitle(step: StepItem): string {
     const sName = (step.args?.server_name as string) || (step.args?.server as string) || ''
     const tName = (step.args?.tool_name as string) || (step.args?.tool as string) || step.target || ''
     return sName ? `MCP: ${sName}/${tName}` : `MCP: ${tName || 'Инструмент'}`
+  }
+  if (step.type === 'browser') {
+    const act = (step.args?.action as string) || step.action || 'navigate'
+    const url = step.target || (step.args?.url as string) || ''
+    if (act === 'navigate' || act === 'Переход') {
+      return url ? `Браузер: Переход на ${url}` : 'Браузер: Переход'
+    }
+    if (act === 'screenshot' || act === 'Скриншот') {
+      return 'Браузер: Снимок экрана'
+    }
+    if (act === 'click' || act === 'Клик') {
+      const sel = step.target || (step.args?.selector as string) || (step.args?.text as string) || ''
+      return sel ? `Браузер: Клик по ${sel}` : 'Браузер: Клик'
+    }
+    if (act === 'type' || act === 'Ввод' || act === 'Ввод текста') {
+      const text = (step.args?.text as string) || ''
+      return text ? `Браузер: Ввод "${text.slice(0, 24)}"` : 'Браузер: Ввод текста'
+    }
+    if (act === 'scroll' || act === 'Прокрутка') {
+      const dir = (step.args?.direction as string) === 'up' ? 'вверх' : 'вниз'
+      return `Браузер: Прокрутка ${dir}`
+    }
+    if (act === 'get_content' || act === 'Чтение страницы') {
+      return 'Браузер: Чтение страницы'
+    }
+    if (act === 'new_tab' || act === 'Новая вкладка') {
+      return url ? `Браузер: Открыть вкладку ${url}` : 'Браузер: Новая вкладка'
+    }
+    if (act === 'close_tab' || act === 'Закрытие вкладки') {
+      return 'Браузер: Закрыть вкладку'
+    }
+    if (act === 'switch_tab' || act === 'Переключение вкладки') {
+      return 'Браузер: Переключить вкладку'
+    }
+    return `Браузер: ${act}`
   }
   if (step.action && step.target) {
     return `${step.action} ${step.target}`
@@ -251,7 +289,8 @@ export const TOOL_VIEWERS: Record<StepType, React.FC<ToolStepViewerProps>> = {
       result={step.result}
       data={step.data}
     />
-  )
+  ),
+  browser: ({ step }) => <BrowserStepViewer step={step} />
 }
 
 /**

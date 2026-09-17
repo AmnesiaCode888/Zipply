@@ -289,12 +289,55 @@ export function calculateTotal(items: number[]): number {
   assert.ok(readAiTabRes.formattedContent.includes('Server listening on http://localhost:3000'), 'Must show output produced')
   console.log('  ✅ TerminalSessionManager: user input in AI terminals & terminal reading verified.\n')
 
+  // Test 10: Terminal Stream Carriage Return (\r) Overwrite & Progress Bar Compaction (Bug Fix)
+  console.log('▶ Testing Component 10: Terminal \\r Overwrite & Progress Bar Compaction...')
+  const { updateTerminalOutputLines, compactTerminalOutputForContext, isProgressBarLine } = await import(
+    '../src/main/services/TerminalOutputUtils'
+  )
+
+  // 10.1: Verify progress bar pattern matching
+  assert.strictEqual(isProgressBarLine('Downloading... [ ] 0% of 47.9 MB'), true, 'Should detect progress bar line')
+  assert.strictEqual(isProgressBarLine('Downloading... [==========] 100% of 47.9 MB'), true, 'Should detect 100% progress line')
+  assert.strictEqual(isProgressBarLine('Normal console log message'), false, 'Should not match normal log')
+
+  // 10.2: Simulating freebuff download stream with \r (Carriage Return)
+  let termLines: string[] = []
+  termLines = updateTerminalOutputLines(termLines, 'Downloading...\n')
+  termLines = updateTerminalOutputLines(termLines, 'Downloading... [ ] 0% of 47.9 MB\r')
+  termLines = updateTerminalOutputLines(termLines, 'Downloading... [ ] 1% of 47.9 MB\r')
+  termLines = updateTerminalOutputLines(termLines, 'Downloading... [======= ] 50% of 47.9 MB\r')
+  termLines = updateTerminalOutputLines(termLines, 'Downloading... [====================] 100% of 47.9 MB\n')
+  termLines = updateTerminalOutputLines(termLines, 'Update complete! Version 0.0.170 installed.\n')
+
+  // In standard terminal, \r updates the current line in-place, so there should NOT be 4 separate 0%, 1%, 50%, 100% lines!
+  assert.strictEqual(termLines.length, 3, `Expected 3 lines (header, 100% progress, complete), got ${termLines.length}: ${JSON.stringify(termLines)}`)
+  assert.strictEqual(termLines[0], 'Downloading...', 'First line should be header')
+  assert.ok(termLines[1].includes('100%'), 'Progress line must be overwritten in place to latest status')
+  assert.strictEqual(termLines[2], 'Update complete! Version 0.0.170 installed.', 'Completion line must follow')
+
+  // 10.3: Compact context for LLM tokens
+  const spamLines = [
+    'Header line',
+    'Downloading... 0%',
+    'Downloading... 25%',
+    'Downloading... 50%',
+    'Downloading... 75%',
+    'Downloading... 100%',
+    'Build succeeded in 1.2s'
+  ]
+  const compacted = compactTerminalOutputForContext(spamLines, 50)
+  assert.ok(compacted.length < spamLines.length, 'Spam progress lines must be compacted')
+  assert.ok(compacted.includes('Downloading... 100%'), 'Latest progress status should be preserved')
+  assert.ok(compacted.includes('Build succeeded in 1.2s'), 'Final result must be preserved')
+
+  console.log('  ✅ Terminal stream: \\r line overwriting & progress bar compaction verified.\n')
+
   // Clean up temporary mjs script
   if (fs.existsSync(path.join(projectRoot, 'scripts', 'test-agent-sota.mjs'))) {
     fs.unlinkSync(path.join(projectRoot, 'scripts', 'test-agent-sota.mjs'))
   }
 
-  console.log('🎉 ALL 9 SOTA AGENT ENHANCEMENT COMPONENTS VERIFIED SUCCESSFULLY!\n')
+  console.log('🎉 ALL 10 SOTA AGENT & TERMINAL ENHANCEMENT COMPONENTS VERIFIED SUCCESSFULLY!\n')
 }
 
 runTests().catch((err) => {

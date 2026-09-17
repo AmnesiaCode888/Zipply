@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { X, FolderOpen, Globe, Zap, AlertCircle, ArrowDownToLine, RefreshCw } from 'lucide-react'
+import './SkillEditorModal.css'
 
 interface SkillImportModalProps {
   isOpen: boolean

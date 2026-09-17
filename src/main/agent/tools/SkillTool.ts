@@ -211,6 +211,11 @@ export class ListSkillsTool extends ToolBase {
         description: 'Краткое действие (2-4 слова, напр. "Список навыков")',
         required: false
       },
+      category: {
+        type: 'string',
+        description: 'Optional category filter: "system", "tools", "engineering", "workspace", "codex", "custom"',
+        required: false
+      },
       filter: {
         type: 'string',
         description: 'Optional filter: "all", "core", "extra", "workspace"',
@@ -229,7 +234,10 @@ export class ListSkillsTool extends ToolBase {
     const skills = SkillService.getAllSkills(workspacePath)
 
     const filter = args.filter || 'all'
+    const categoryFilter = typeof args.category === 'string' ? args.category.toLowerCase().trim() : undefined
+
     const filtered = skills.filter((s) => {
+      if (categoryFilter && (s.category || 'custom').toLowerCase() !== categoryFilter) return false
       if (filter === 'core') return s.isCore
       if (filter === 'extra') return !s.isCore
       if (filter === 'workspace') return s.source === 'workspace' || s.source === 'cursor' || s.source === 'codex'
@@ -241,7 +249,8 @@ export class ListSkillsTool extends ToolBase {
     }
 
     const list = filtered.map((s) => {
-      const parts = [`- **${s.name}** [${s.isCore ? 'Core' : 'Extra'}] (${s.source}): ${s.description}`]
+      const catBadge = s.categoryLabel ? ` [${s.categoryLabel}]` : ''
+      const parts = [`- **${s.name}**${catBadge} (${s.source}): ${s.description}`]
       if (s.triggers && s.triggers.length > 0) parts.push(`  • Триггеры: ${s.triggers.slice(0, 4).join(', ')}`)
       if (s.globs && s.globs.length > 0) parts.push(`  • Маски: \`${s.globs.slice(0, 3).join(', ')}\``)
       if (s.files && s.files.length > 0) parts.push(`  • Файлы: ${s.files.length} шт. (scripts/references)`)
@@ -250,7 +259,7 @@ export class ListSkillsTool extends ToolBase {
 
     return {
       formattedContent: `=== ДОСТУПНЫЕ НАВЫКИ (${filtered.length}) ===\n\n${list.join('\n\n')}\n\nДля загрузки любого навыка используй: \`read_skill(skill_name="...")\`.`,
-      data: { count: filtered.length, skills: filtered.map((s) => ({ name: s.name, description: s.description, source: s.source, isCore: s.isCore })) }
+      data: { count: filtered.length, skills: filtered.map((s) => ({ name: s.name, description: s.description, source: s.source, isCore: s.isCore, category: s.category })) }
     }
   }
 }
@@ -323,7 +332,8 @@ export class SearchSkillTool extends ToolBase {
     const lines = results.map((s, idx) => {
       const matchScore = s.similarityScore ? ` [${s.similarityScore}% совпадение]` : ''
       const reason = s.matchReason ? ` (${s.matchReason})` : ''
-      const parts = [`${idx + 1}. **${s.name}**${matchScore}${reason}: ${s.description}`]
+      const catBadge = s.categoryLabel ? ` [${s.categoryLabel}]` : ''
+      const parts = [`${idx + 1}. **${s.name}**${catBadge}${matchScore}${reason}: ${s.description}`]
       if (s.triggers && s.triggers.length > 0) parts.push(`   • Триггеры: ${s.triggers.slice(0, 4).join(', ')}`)
       if (s.globs && s.globs.length > 0) parts.push(`   • Маски файлов: \`${s.globs.slice(0, 3).join(', ')}\``)
       return parts.join('\n')

@@ -11,6 +11,22 @@ export interface ToolLogEntry {
   error: boolean
   /** first 120 chars of result */
   resultSnippet: string
+  /** Native tool name (e.g. 'file', 'terminal', 'grep_search') */
+  toolName?: string
+  /** Sub-action if applicable (e.g. 'read', 'edit', 'write', 'run') */
+  action?: string
+  /** Target file path, command, or query */
+  target?: string
+}
+
+export function isInspectionEntry(e: ToolLogEntry): boolean {
+  if (e.toolName === 'file') {
+    return e.action === 'read' || !e.action || e.action === 'read_tree'
+  }
+  if (e.toolName === 'read_page' || e.toolName === 'grep_search') {
+    return true
+  }
+  return /чтение|read|file.*read|view|inspect|просмотр/i.test(e.summary)
 }
 
 export type WatchdogStatus = 'continue' | 'warn' | 'intervene'
@@ -114,8 +130,9 @@ export function compressToolLog(entries: ToolLogEntry[], windowSize = 100): stri
       entry.resultSnippet.length > 20 && entry.resultSnippet === prevSnippet
     const sameResultNote = sameResultAsPrev && repeatCount === 1 ? ' [same result as previous action]' : ''
 
+    const targetTag = entry.target ? ` [target: ${entry.target.split(/[\\/]/).pop()}]` : ''
     const snippet = entry.resultSnippet.replace(/\n/g, ' ').slice(0, 120)
-    lines.push(`[${displayIdx}] ${entry.summary} → ${snippet} ${icon}${repeatNote}${sameResultNote}`)
+    lines.push(`[${displayIdx}] ${entry.summary}${targetTag} → ${snippet} ${icon}${repeatNote}${sameResultNote}`)
     i += repeatCount
     displayIdx++ // one line per compressed group, not per raw entry
   }
@@ -195,14 +212,46 @@ export class WatchdogService {
       }
     }
 
-    // Rule 4: Micro-reading the same file repeatedly (4+ consecutive reads)
-    if (entries.length >= 4) {
-      const last4 = entries.slice(-4)
-      const isReadSummary = (s: string): boolean => /чтение|read|file.*read|view/i.test(s)
-      if (last4.every((e) => isReadSummary(e.summary) && !e.error)) {
-        return {
-          status: 'warn',
-          message: 'Ты читаешь файлы уже 4 шага подряд без внесения изменений. Переходи к редактированию или проверке гипотезы.'
+    // Rule 4: Micro-reading & passive looping detection
+    if (entries.length >= 3) {
+      const recent = entries.slice(-6)
+
+      // Rule 4a: Same target file read repeatedly (>= 3 times in last 6 steps)
+      const readTargets = new Map<string, number>()
+      for (const e of recent) {
+        if (isInspectionEntry(e) && e.target) {
+          readTargets.set(e.target, (readTargets.get(e.target) || 0) + 1)
+        }
+      }
+      for (const [target, count] of readTargets) {
+        if (count >= 3) {
+          const fileName = target.split(/[\\/]/).pop() || target
+          return {
+            status: 'intervene',
+            message: `Файл «${fileName}» прочитан ${count} раз за последние 6 шагов. Прекрати повторное чтение — переходи к внесению правок (edit/write) либо вызови read_skill("tool-file-mastery") / read_skill("when-stuck").`
+          }
+        }
+      }
+
+      // Rule 4b: 6+ consecutive inspections -> intervene!
+      if (entries.length >= 6) {
+        const last6 = entries.slice(-6)
+        if (last6.every((e) => isInspectionEntry(e) && !e.error)) {
+          return {
+            status: 'intervene',
+            message: '6 шагов подряд только чтение без действий! Немедленно переходи к написанию кода или вызови read_skill("when-stuck").'
+          }
+        }
+      }
+
+      // Rule 4c: 4+ consecutive inspection calls without any code modification -> warn
+      if (entries.length >= 4) {
+        const last4 = entries.slice(-4)
+        if (last4.every((e) => isInspectionEntry(e) && !e.error)) {
+          return {
+            status: 'warn',
+            message: 'Ты выполняешь чтение файлов уже 4 шага подряд без изменений кода. Переходи к редактированию или обратись к read_skill("when-stuck").'
+          }
         }
       }
     }

@@ -20,6 +20,7 @@ interface TitleBarProps {
 
 const SETTINGS_TAB_NAMES: Record<SettingsTab, string> = {
   models: 'Конфигурация',
+  access: 'Доступ',
   mcp: 'MCP Серверы',
   appearance: 'Темы и оформление',
   shortcuts: 'Горячие клавиши',
@@ -169,7 +170,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
       <div className="titlebar-drag-spacer" />
 
       {!isRightPanelOpen && (
-        <div className="titlebar-right-closed">
+        <div className="titlebar-right-controls">
           {onToggleRightPanel && (
             <button
               type="button"

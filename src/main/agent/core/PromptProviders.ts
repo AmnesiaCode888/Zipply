@@ -55,6 +55,11 @@ ${roleDescription}
 3. **Action-First & Zero-Filler**: Avoid empty conversational pleasantries ("Sure!", "I'd be glad to help!"). Proceed straight to the technical solution or tool execution.
 4. **Anti-Thrashing Rule**: If a tool or command fails twice with the same error, STOP immediately. Do NOT repeat the exact same tool call. Re-read the full error message, inspect the codebase, and revise your hypothesis.
 5. **Non-Interactive Execution**: Never invoke commands that require interactive user confirmation or stdin prompts. Always supply automated non-interactive flags (e.g. \`-y\`, \`--no-interactive\`, \`-m\`).
+6. **Perplexity, Stuck & Troubleshooting Protocol (Two-Tier Reflex)**:
+   - If you are ever confused, unsure how to proceed, or face an unfamiliar library, error, or build failure: **DO NOT GUESS OR BLINDLY MODIFY CODE**.
+   - **Tier 1 (Skills First)**: Immediately search your skills library with \`search_skills(query="...")\` or call \`read_skill(skill_name="when-stuck")\`. Follow the expert procedural steps defined in the skill.
+   - **Tier 2 (Web Intelligence)**: If skills do not cover the specific runtime error or external library issue, immediately call \`web_search(query="<exact error or library issue>")\` to find verified fixes on GitHub issues, official docs, or StackOverflow.
+   - **Tier 3 (Environment Inspection & Delegation)**: Inspect open IDE terminals via \`terminal(action="read_terminal")\` to check real logs, or delegate deep research via \`ask_agent(agent_id="ask" | "architect")\`.
 </Identity>`
   }
 }
@@ -104,6 +109,22 @@ export const SkillsProvider: PromptSectionProvider = {
     if (!coreSkills.trim() && !extraSkills.trim()) return null
 
     return `<skills_system>
+## On-Demand Procedural Skills:
+- You have access to a rich library of specialized skills for engineering workflows, tools, and troubleshooting organized by categories.
+- You can discover relevant skills at any time via \`search_skills(query="...")\` or list category skills via \`list_skills(category="...")\`.
+- You do NOT need to load all skills at once, but you MUST proactively read relevant skills via \`read_skill(skill_name="...")\` in these key situations:
+  1. **Before Architecting or Implementing Features**:
+     - Creating backend, APIs, Express/Node server → \`read_skill(skill_name="backend-api-architecture")\`
+     - Creating web UI, React, Vite, components, state → \`read_skill(skill_name="frontend-modern-web")\`
+     - Database schemas, SQL, SQLite, migrations → \`read_skill(skill_name="database-migrations-sql")\`
+     - Complex tasks / decomposing into parallel sub-agents → \`read_skill(skill_name="tool-subagents-swarm")\`
+  2. **Before Complex Tool Operations**:
+     - Inspecting/editing existing code files without wiping → \`read_skill(skill_name="tool-file-mastery")\`
+     - Running background processes/terminals → \`read_skill(skill_name="tool-terminal-mastery")\`
+     - MCP servers & dynamic tool integrations → \`read_skill(skill_name="tool-mcp-integration")\`
+  3. **When Confused, Repeating Actions, or Facing Tough Errors**:
+     - Repeated reads, unclear next steps, or hesitation → \`read_skill(skill_name="when-stuck")\`
+     - Mysterious bug, runtime error, or build failure → \`read_skill(skill_name="systematic-debugging")\`
 ${coreSkills.trim()}
 ${extraSkills.trim()}
 </skills_system>`
@@ -275,6 +296,9 @@ export const SandwichReminderProvider: PromptSectionProvider = {
     return `<system_reminder>
 - Execute required actions directly with tools rather than giving passive advice.
 - When finished, summarize modifications and verification results in Russian.
+- Tags like <past_tool_round>, <past_subagent_round>, <past_subagent_answer> in the conversation history are internal serialization markers for past actions — never reproduce or output them in your responses.
+- Before starting new multi-file projects, major features, or complex tool operations, consult the relevant skill via read_skill (e.g. frontend-modern-web, backend-api-architecture, tool-subagents-swarm).
+- If you get stuck, confused, or face repeated reads / errors, never guess or loop: search skills (search_skills) or search the web (web_search), and call \`read_skill(skill_name="when-stuck")\` before taking further action.
 ${enforcement ? `\n${enforcement.trim()}` : ''}
 ${scratchpad ? `\n<scratchpad>\n${scratchpad.trim()}\n</scratchpad>` : ''}${microagentSection}
 </system_reminder>`

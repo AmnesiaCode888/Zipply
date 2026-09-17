@@ -94,6 +94,10 @@ export const ProjectFileTree: React.FC<ProjectFileTreeProps> = ({
   useEffect(() => {
     if (!rootPath) return
     setIsLoadingRoot(true)
+    setChildrenMap({})
+    setSelectedPath(null)
+    setRenamingPath(null)
+    setInlineCreate(null)
     loadDirectory(rootPath).finally(() => {
       setIsLoadingRoot(false)
       setExpandedPaths(new Set([rootPath]))
@@ -245,17 +249,15 @@ export const ProjectFileTree: React.FC<ProjectFileTreeProps> = ({
     e.preventDefault()
     e.stopPropagation()
 
-    let posX = e.clientX
-    let posY = e.clientY
-
-    // Guard window boundary
-    if (posX + 190 > window.innerWidth) posX = window.innerWidth - 195
-    if (posY + 230 > window.innerHeight) posY = window.innerHeight - 235
+    const menuWidth = 210
+    const menuHeight = 260
+    const posX = Math.min(e.clientX, window.innerWidth - menuWidth - 8)
+    const posY = Math.min(e.clientY, window.innerHeight - menuHeight - 8)
 
     setContextMenu({
       isOpen: true,
-      x: Math.max(10, posX),
-      y: Math.max(10, posY),
+      x: Math.max(8, posX),
+      y: Math.max(8, posY),
       targetItem: item
     })
   }

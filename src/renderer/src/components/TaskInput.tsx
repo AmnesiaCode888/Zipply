@@ -23,7 +23,8 @@ import {
   Image as ImageIcon,
   ChevronRight,
   ListTodo,
-  Maximize2
+  Maximize2,
+  Globe
 } from 'lucide-react'
 import { getModelDisplayName } from '../utils/modelUtils'
 import { SettingsTab } from '../types/settings'
@@ -44,6 +45,7 @@ interface SuggestionItem {
 interface TaskInputProps {
   onSubmit?: (text: string, project?: ProjectRef | null, images?: AttachedImage[]) => void
   onOpenSettings?: (tab?: SettingsTab) => void
+  onOpenBrowser?: () => void
 }
 
 function escapeRegExp(s: string): string {
@@ -169,7 +171,7 @@ function renderHighlightedText(text: string, paths: string[]): React.ReactNode[]
   return nodes
 }
 
-export const TaskInput: React.FC<TaskInputProps> = ({ onSubmit, onOpenSettings }) => {
+export const TaskInput: React.FC<TaskInputProps> = ({ onSubmit, onOpenSettings, onOpenBrowser }) => {
   const [taskText, setTaskText] = useState('')
   const [project, setProject] = useState<ProjectRef | null>(null)
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([])
@@ -407,12 +409,32 @@ export const TaskInput: React.FC<TaskInputProps> = ({ onSubmit, onOpenSettings }
   }
 
 
-  const handleMenuItemHover = (type: 'attach' | 'plan' | 'projects'): void => {
+  const handleCreatePlan = (): void => {
+    setShowMenu(false)
+    setShowProjectsSubmenu(false)
+    const current = taskText.trim()
+    if (!current) {
+      setTaskText('Составь подробный пошаговый план реализации: ')
+    } else if (!current.toLowerCase().includes('план')) {
+      setTaskText(`Составь подробный пошаговый план реализации следующей задачи:\n${taskText}`)
+    }
+    setTimeout(() => {
+      textareaRef.current?.focus()
+    }, 50)
+  }
+
+  const handleOpenBrowserClick = (): void => {
+    setShowMenu(false)
+    setShowProjectsSubmenu(false)
+    onOpenBrowser?.()
+  }
+
+  const handleMenuItemHover = (type: 'attach' | 'plan' | 'browser' | 'projects'): void => {
     if (submenuTimerRef.current) {
       clearTimeout(submenuTimerRef.current)
       submenuTimerRef.current = null
     }
-    if (type === 'attach' || type === 'plan') {
+    if (type === 'attach' || type === 'plan' || type === 'browser') {
       setShowProjectsSubmenu(false)
     } else if (type === 'projects') {
       setShowProjectsSubmenu(true)
@@ -711,14 +733,21 @@ export const TaskInput: React.FC<TaskInputProps> = ({ onSubmit, onOpenSettings }
                 <button
                   type="button"
                   className="task-add-menu-item"
-                  onClick={() => {
-                    setShowMenu(false)
-                    setShowProjectsSubmenu(false)
-                  }}
+                  onClick={handleCreatePlan}
                   onMouseEnter={() => handleMenuItemHover('plan')}
                 >
                   <ListTodo size={16} className="task-add-menu-icon" strokeWidth={1.8} />
                   <span className="task-add-menu-label">Создать план</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="task-add-menu-item"
+                  onClick={handleOpenBrowserClick}
+                  onMouseEnter={() => handleMenuItemHover('browser')}
+                >
+                  <Globe size={16} className="task-add-menu-icon" strokeWidth={1.8} />
+                  <span className="task-add-menu-label">Браузер</span>
                 </button>
 
                 <div

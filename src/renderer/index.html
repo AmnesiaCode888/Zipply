@@ -23,6 +23,8 @@
             if (cfg.accentColor) document.documentElement.setAttribute('data-accent', cfg.accentColor);
             if (cfg.compactMode) document.documentElement.setAttribute('data-compact', 'true');
             if (cfg.fontSize) document.documentElement.style.setProperty('--app-font-size-base', cfg.fontSize + 'px');
+          } else {
+            document.documentElement.setAttribute('data-theme', 'midnight');
           }
         } catch (e) {}
       })();

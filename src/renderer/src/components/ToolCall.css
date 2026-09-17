@@ -145,14 +145,14 @@
 }
 
 .term-dollar {
-  color: var(--text-muted, #71717A);
+  color: var(--accent-text, var(--accent-primary, #71717A));
   font-weight: 600;
   user-select: none;
 }
 
 .term-cmd-bold {
   color: var(--text-primary, #FFFFFF);
-  font-weight: 550;
+  font-weight: 600;
 }
 
 .term-output-row {
@@ -163,17 +163,17 @@
   padding: 1px 32px 1px 10px;
   white-space: pre-wrap;
   word-break: break-word;
-  color: var(--text-secondary, #A1A1AA);
-  font-size: 11.5px;
+  color: var(--code-text, var(--text-primary, #FFFFFF));
+  font-size: 12px;
   line-height: 1.5;
 }
 
 .term-output-row.term-pass {
-  color: var(--text-primary, #D4D4D8);
+  color: var(--btn-green, #10B981);
 }
 
 .term-output-row.term-fail {
-  color: #DC2626;
+  color: var(--btn-red, #EF4444);
 }
 
 .term-row-txt {
@@ -671,4 +671,357 @@
   font-size: 11.5px;
   color: var(--text-muted, #52525B);
   font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   9. BROWSER STEP VIEWER (Polished, Sleek & Informative)
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.browser-step-viewer {
+  display: flex;
+  flex-direction: column;
+}
+
+.browser-step-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 36px 6px 10px;
+  border-bottom: 1px solid var(--border-subtle, #1E1E22);
+  background: var(--card-bg, rgba(255, 255, 255, 0.015));
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.browser-step-action-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4.5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1.5px 7px;
+  border-radius: 4px;
+  background: rgba(56, 189, 248, 0.12);
+  color: #38BDF8;
+  letter-spacing: 0.01em;
+  flex-shrink: 0;
+}
+
+.browser-step-url-link {
+  font-size: 12px;
+  color: var(--text-secondary, #D4D4D8);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+.browser-step-url-link:hover {
+  color: #FFFFFF;
+  text-decoration: underline;
+}
+
+.browser-step-host {
+  font-weight: 500;
+}
+
+.browser-step-ext-icon {
+  color: var(--text-muted, #71717A);
+  flex-shrink: 0;
+}
+
+.browser-step-title {
+  font-size: 11.5px;
+  color: var(--text-muted, #71717A);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+/* Error Banner - clean, modern, no code line numbers */
+.browser-step-error-banner {
+  margin: 8px 10px;
+  padding: 8px 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  border-radius: 6px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.browser-step-error-icon {
+  color: #EF4444;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.browser-step-error-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.browser-step-error-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #F87171;
+}
+
+.browser-step-error-msg {
+  font-size: 12px;
+  color: #E4E4E7;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+/* Screenshot Preview Box */
+.browser-step-screenshot-box {
+  margin: 8px 10px;
+  border: 1px solid var(--border-subtle, #1E1E22);
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.browser-step-screenshot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+  background: var(--bg-surface, #141416);
+  border-bottom: 1px solid var(--border-subtle, #1E1E22);
+}
+
+.browser-step-screenshot-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 550;
+  color: var(--text-secondary, #A1A1AA);
+}
+
+.browser-step-zoom-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--text-muted, #71717A);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.browser-step-zoom-btn:hover {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.browser-step-screenshot-thumb-wrapper {
+  cursor: zoom-in;
+  max-height: 200px;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  background: #000000;
+}
+
+.browser-step-screenshot-img {
+  width: 100%;
+  object-fit: cover;
+  object-position: top;
+  transition: transform 0.2s ease;
+}
+
+.browser-step-screenshot-thumb-wrapper:hover .browser-step-screenshot-img {
+  transform: scale(1.015);
+}
+
+/* Interactive Elements Section */
+.browser-step-elements-section {
+  margin: 6px 10px 8px 10px;
+  border: 1px solid var(--border-subtle, #1E1E22);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.browser-step-elements-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--card-bg, rgba(255, 255, 255, 0.02));
+  border: none;
+  color: var(--text-secondary, #A1A1AA);
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 500;
+  transition: background 0.15s ease;
+}
+
+.browser-step-elements-toggle:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.browser-step-elements-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.browser-step-elements-count-badge {
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--text-muted, #71717A);
+}
+
+.browser-step-elements-list {
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.18);
+  border-top: 1px solid var(--border-subtle, #1E1E22);
+}
+
+.browser-step-element-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.browser-step-element-id {
+  color: #38BDF8;
+  font-weight: 600;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.browser-step-element-tag {
+  color: #F59E0B;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.browser-step-element-text {
+  color: var(--text-primary, #E4E4E7);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.browser-step-element-selector {
+  color: var(--text-muted, #71717A);
+  font-size: 10px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.browser-step-elements-more {
+  font-size: 10.5px;
+  color: var(--text-muted, #71717A);
+  font-style: italic;
+  padding-top: 2px;
+}
+
+/* Body Content */
+.browser-step-body-content {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-secondary, #D4D4D8);
+  line-height: 1.5;
+  max-height: 240px;
+  overflow-y: auto;
+  font-family: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Fullscreen Lightbox */
+.browser-step-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.browser-step-lightbox-content {
+  background: #121214;
+  border: 1px solid #27272A;
+  border-radius: 8px;
+  max-width: 92vw;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6);
+}
+
+.browser-step-lightbox-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-bottom: 1px solid #27272A;
+  background: #18181B;
+}
+
+.browser-step-lightbox-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #F4F4F5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.browser-step-lightbox-close {
+  background: transparent;
+  border: none;
+  color: #A1A1AA;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.browser-step-lightbox-close:hover {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.browser-step-lightbox-body {
+  padding: 10px;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #09090B;
+}
+
+.browser-step-lightbox-body img {
+  max-width: 100%;
+  max-height: 82vh;
+  object-fit: contain;
+  border-radius: 4px;
 }
