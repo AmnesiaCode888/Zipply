@@ -29,6 +29,7 @@ publish:
   provider: github
   owner: AmnesiaCode888
   repo: Zipply
+  releaseType: release
 
 win:
   icon: resources/icon.ico
