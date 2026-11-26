@@ -99,7 +99,7 @@ Zipply объединяет основного инженера (`ZipplyAgent`) 
 
 ## Скачивание
 
-Текущая версия: **`v0.1.0`**. Готовые сборки для **Windows** (установщик `.exe` NSIS) и **Linux** (`.AppImage`, `.deb`) доступны на официальных страницах:
+Текущая версия: **`v0.1.0`**. Готовые сборки для **Windows** (установщик `.exe` NSIS) и **Linux** (`.AppImage`, `.deb`, `.pkg.tar.zst`) доступны на официальных страницах:
 
 * **Официальный сайт**: [zipply.my](https://zipply.my)
 * **GitHub Releases**: [github.com/AmnesiaCode888/Zipply/releases](https://github.com/AmnesiaCode888/Zipply/releases)

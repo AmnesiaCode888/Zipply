@@ -19,8 +19,10 @@ jobs:
         include:
           - os: windows-latest
             platform_args: --win --config.npmRebuild=false
+            build_pacman: false
           - os: ubuntu-latest
             platform_args: --linux AppImage deb
+            build_pacman: true
 
     steps:
       - name: Checkout repository
@@ -32,6 +34,10 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Install zstd (Linux)
+        if: matrix.build_pacman == true
+        run: sudo apt-get update && sudo apt-get install -y zstd
+
       - name: Install dependencies
         run: npm ci
 
@@ -42,3 +48,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder ${{ matrix.platform_args }} --publish always
+
+      - name: Build Arch Linux package (.pkg.tar.zst)
+        if: matrix.build_pacman == true
+        run: node scripts/build-pacman.js
+
+      - name: Upload Arch Linux package to release
+        if: matrix.build_pacman == true && startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.ref_name }}" dist/*.pkg.tar.zst --clobber

@@ -24,9 +24,10 @@
     "dev": "electron-vite dev --watch",
     "build": "npm run typecheck && electron-vite build",
     "build:win": "npm run build && electron-builder --win --config.npmRebuild=false",
-    "build:linux": "npm run build && electron-builder --linux AppImage deb",
+    "build:linux": "npm run build && electron-builder --linux AppImage deb && node scripts/build-pacman.js",
     "build:appimage": "npm run build && electron-builder --linux AppImage",
     "build:deb": "npm run build && electron-builder --linux deb",
+    "build:pacman": "npm run build && electron-builder --linux dir && node scripts/build-pacman.js",
     "build:cli": "esbuild src/main/agent/cli.ts --bundle --platform=node --format=cjs --outfile=out/cli/zipply-agent.cjs --external:electron --external:node-pty --external:playwright-core",
     "agent:eval": "npm run build:cli && node out/cli/zipply-agent.cjs --eval tests/fixtures/harness",
     "test:e2e": "npm run build && node --test --test-concurrency=1 tests/e2e/*.test.cjs"

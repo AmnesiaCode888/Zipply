@@ -99,7 +99,7 @@ Current focus areas we are actively improving:
 
 ## Downloads
 
-Current version: **`v0.1.0`**. Pre-built packages for **Windows** (`.exe` NSIS installer) and **Linux** (`.AppImage`, `.deb`) are distributed via:
+Current version: **`v0.1.0`**. Pre-built packages for **Windows** (`.exe` NSIS installer) and **Linux** (`.AppImage`, `.deb`, `.pkg.tar.zst`) are distributed via:
 
 * **Official Website**: [zipply.my](https://zipply.my)
 * **GitHub Releases**: [github.com/AmnesiaCode888/Zipply/releases](https://github.com/AmnesiaCode888/Zipply/releases)
