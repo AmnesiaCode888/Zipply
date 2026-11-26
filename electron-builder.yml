@@ -1,0 +1,88 @@
+appId: com.zipply.app
+productName: Zipply
+copyright: Copyright © 2026 Zipply (support@zipply.my)
+
+directories:
+  buildResources: resources
+  output: dist
+
+files:
+  - out/**/*
+  - resources/**/*
+  - package.json
+  - '!**/*.map'
+  - '!docs/**'
+  - '!tests/**'
+  - '!scratch/**'
+  - '!weppy-project-sync/**'
+  - '!.superpowers/**'
+
+asarUnpack:
+  - '**/*.node'
+  - 'node_modules/node-pty/**/*'
+  - 'node_modules/playwright-core/**/*'
+
+extraMetadata:
+  homepage: https://zipply.my
+
+publish:
+  provider: github
+  owner: AmnesiaCode888
+  repo: Zipply
+
+win:
+  icon: resources/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: Zipply-Setup-${version}-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Zipply
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
+
+linux:
+  icon: resources/icon.png
+  executableName: zipply
+  maintainer: Zipply <support@zipply.my>
+  vendor: Zipply
+  category: Development
+  synopsis: Autonomous Desktop AI Coding Workspace
+  description: Zipply — Autonomous Desktop AI Coding Workspace with subagent orchestration, MCP, dynamic skills, and integrated tools.
+  desktop:
+    entry:
+      Name: Zipply
+      GenericName: AI Coding Workspace
+      Comment: Autonomous Desktop AI Coding Workspace
+      Categories: Development;IDE;
+      StartupWMClass: Zipply
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+
+appImage:
+  artifactName: Zipply-${version}-x86_64.${ext}
+
+deb:
+  artifactName: zipply_${version}_amd64.${ext}
+
+mac:
+  icon: resources/icon.png
+  category: public.app-category.developer-tools
+  target:
+    - target: dmg
+      arch:
+        - universal
+    - target: zip
+      arch:
+        - universal

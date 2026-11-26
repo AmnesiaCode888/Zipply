@@ -1,0 +1,118 @@
+{
+  "timestamp": "2026-11-24T19:37:56.574Z",
+  "total": 6,
+  "passed": 6,
+  "failed": 0,
+  "passRate": 1,
+  "falseVerifiedCount": 0,
+  "totalTokens": 231,
+  "totalElapsedMs": 896,
+  "results": [
+    {
+      "id": "01-no-false-verified",
+      "description": "Reading ORCHID then mutating file to GONE without valid verify_file must never report verified",
+      "passed": true,
+      "failures": [],
+      "falseVerified": false,
+      "reason": "completed",
+      "verificationStatus": "unverified",
+      "usage": {
+        "promptTokens": 40,
+        "completionTokens": 20,
+        "totalTokens": 60,
+        "complete": true
+      },
+      "elapsedMs": 120,
+      "rounds": 4
+    },
+    {
+      "id": "02-incomplete-sse-blocks-tools",
+      "description": "Truncated SSE stream without finish_reason or [DONE] must finish as incomplete without executing streamed tool calls",
+      "passed": true,
+      "failures": [],
+      "falseVerified": false,
+      "reason": "incomplete",
+      "verificationStatus": "unverified",
+      "usage": {
+        "promptTokens": 0,
+        "completionTokens": 0,
+        "totalTokens": 0,
+        "complete": false,
+        "estimated": true,
+        "estimateMethod": "serialized characters ÷ 3.2"
+      },
+      "elapsedMs": 18,
+      "rounds": 1
+    },
+    {
+      "id": "03-readonly-sandbox-blocks-write",
+      "description": "OS read-only sandbox physically blocks shell scripts from writing or overwriting workspace files",
+      "passed": true,
+      "failures": [],
+      "falseVerified": false,
+      "reason": "completed",
+      "verificationStatus": "unverified",
+      "usage": {
+        "promptTokens": 20,
+        "completionTokens": 10,
+        "totalTokens": 30,
+        "complete": false,
+        "estimated": true,
+        "estimateMethod": "serialized characters ÷ 3.2"
+      },
+      "elapsedMs": 244,
+      "rounds": 3
+    },
+    {
+      "id": "04-nested-agents-before-patch",
+      "description": "Nested sub/AGENTS.md is discovered from apply_patch targets before writing, allowing the model to comply and verify",
+      "passed": true,
+      "failures": [],
+      "falseVerified": false,
+      "reason": "completed",
+      "verificationStatus": "verified",
+      "usage": {
+        "promptTokens": 40,
+        "completionTokens": 20,
+        "totalTokens": 60,
+        "complete": true
+      },
+      "elapsedMs": 18,
+      "rounds": 4
+    },
+    {
+      "id": "05-subagent-reviewer-budget",
+      "description": "Reviewer subagent receives role instructions in compiled prompt and rolls 3 x 12 = 36 tokens up into shared RunBudget",
+      "passed": true,
+      "failures": [],
+      "falseVerified": false,
+      "reason": "completed",
+      "verificationStatus": "unverified",
+      "usage": {
+        "promptTokens": 21,
+        "completionTokens": 15,
+        "totalTokens": 36,
+        "complete": true
+      },
+      "elapsedMs": 8,
+      "rounds": 2
+    },
+    {
+      "id": "06-bugfix-and-verify",
+      "description": "End-to-end bugfix of math.js with real node --test execution inside workspace-write sandbox and independent verification",
+      "passed": true,
+      "failures": [],
+      "falseVerified": false,
+      "reason": "completed",
+      "verificationStatus": "verified",
+      "usage": {
+        "promptTokens": 30,
+        "completionTokens": 15,
+        "totalTokens": 45,
+        "complete": true
+      },
+      "elapsedMs": 324,
+      "rounds": 3
+    }
+  ]
+}

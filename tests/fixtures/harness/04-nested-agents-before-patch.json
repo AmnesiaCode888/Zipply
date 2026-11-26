@@ -1,0 +1,88 @@
+{
+  "id": "04-nested-agents-before-patch",
+  "description": "Nested sub/AGENTS.md is discovered from apply_patch targets before writing, allowing the model to comply and verify",
+  "prompt": "Create sub/app.txt respecting local folder rules and verify it",
+  "accessMode": "automatic",
+  "taskState": {
+    "goal": "Create sub/app.txt respecting sub/AGENTS.md",
+    "constraints": [],
+    "acceptanceCriteria": ["sub/app.txt contains SUB_RULE_HEADER"],
+    "confirmedFacts": [],
+    "nextStep": ""
+  },
+  "files": {
+    "sub/AGENTS.md": "# Subdir Rules\nInclude SUB_RULE_HEADER at line 1 of files in sub/.\n"
+  },
+  "responses": [
+    {
+      "body": {
+        "usage": { "prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15 },
+        "choices": [{
+          "message": {
+            "content": null,
+            "tool_calls": [{
+              "id": "ap1",
+              "type": "function",
+              "function": {
+                "name": "apply_patch",
+                "arguments": "{\"patch\":\"*** Begin Patch\\n*** Add File: sub/app.txt\\n+draft\\n*** End Patch\"}"
+              }
+            }]
+          }
+        }]
+      }
+    },
+    {
+      "body": {
+        "usage": { "prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15 },
+        "choices": [{
+          "message": {
+            "content": null,
+            "tool_calls": [{
+              "id": "ap2",
+              "type": "function",
+              "function": {
+                "name": "apply_patch",
+                "arguments": "{\"patch\":\"*** Begin Patch\\n*** Add File: sub/app.txt\\n+SUB_RULE_HEADER\\n+ok\\n*** End Patch\"}"
+              }
+            }]
+          }
+        }]
+      }
+    },
+    {
+      "body": {
+        "usage": { "prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15 },
+        "choices": [{
+          "message": {
+            "content": null,
+            "tool_calls": [{
+              "id": "vf1",
+              "type": "function",
+              "function": {
+                "name": "verify_file",
+                "arguments": "{\"path\":\"sub/app.txt\",\"predicate\":\"contains\",\"expected\":\"SUB_RULE_HEADER\",\"criterion_id\":\"c_1\"}"
+              }
+            }]
+          }
+        }]
+      }
+    },
+    {
+      "body": {
+        "usage": { "prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15 },
+        "choices": [{ "message": { "content": "Created and verified sub/app.txt." } }]
+      }
+    }
+  ],
+  "expected": {
+    "expectedReason": "completed",
+    "expectedVerificationStatus": "verified",
+    "expectedFiles": {
+      "sub/app.txt": { "contains": ["SUB_RULE_HEADER", "ok"] }
+    },
+    "expectedRequestMatches": [
+      { "index": 1, "pattern": "SUB_RULE_HEADER" }
+    ]
+  }
+}

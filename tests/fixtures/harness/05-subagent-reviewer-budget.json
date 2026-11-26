@@ -1,0 +1,49 @@
+{
+  "id": "05-subagent-reviewer-budget",
+  "description": "Reviewer subagent receives role instructions in compiled prompt and rolls 3 x 12 = 36 tokens up into shared RunBudget",
+  "prompt": "Review src/app.js via reviewer subagent",
+  "accessMode": "automatic",
+  "runLimits": { "tokens": 100 },
+  "files": {
+    "src/app.js": "export const ok = true;\n"
+  },
+  "responses": [
+    {
+      "body": {
+        "usage": { "prompt_tokens": 7, "completion_tokens": 5, "total_tokens": 12 },
+        "choices": [{
+          "message": {
+            "content": null,
+            "tool_calls": [{
+              "id": "sub_rev_1",
+              "type": "function",
+              "function": {
+                "name": "spawn_agent",
+                "arguments": "{\"task\":\"Review src/app.js\",\"role\":\"reviewer\",\"max_rounds\":3}"
+              }
+            }]
+          }
+        }]
+      }
+    },
+    {
+      "body": {
+        "usage": { "prompt_tokens": 7, "completion_tokens": 5, "total_tokens": 12 },
+        "choices": [{ "message": { "content": "Reviewed src/app.js:1 cleanly." } }]
+      }
+    },
+    {
+      "body": {
+        "usage": { "prompt_tokens": 7, "completion_tokens": 5, "total_tokens": 12 },
+        "choices": [{ "message": { "content": "Reviewer finished with 0 findings." } }]
+      }
+    }
+  ],
+  "expected": {
+    "expectedReason": "completed",
+    "expectedUsageTotal": 36,
+    "expectedRequestMatches": [
+      { "index": 1, "pattern": "<subagent_role role=\"reviewer\">" }
+    ]
+  }
+}

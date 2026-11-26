@@ -1,0 +1,22 @@
+{
+  "id": "02-incomplete-sse-blocks-tools",
+  "description": "Truncated SSE stream without finish_reason or [DONE] must finish as incomplete without executing streamed tool calls",
+  "prompt": "Inspect a.txt and list directory",
+  "accessMode": "automatic",
+  "stream": true,
+  "files": {
+    "a.txt": "alpha"
+  },
+  "responses": [
+    {
+      "sseChunks": [
+        "data: {\"choices\":[{\"delta\":{\"content\":\"Checking files...\",\"tool_calls\":[{\"index\":0,\"id\":\"sse_t1\",\"type\":\"function\",\"function\":{\"name\":\"list_dir\",\"arguments\":\"{\\\"path\\\":\\\".\\\"}\"}}]}}] }\n\n"
+      ]
+    }
+  ],
+  "expected": {
+    "expectedReason": "incomplete",
+    "expectedToolsExecutedCount": 0,
+    "forbiddenVerificationStatus": "verified"
+  }
+}

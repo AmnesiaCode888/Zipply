@@ -1,0 +1,67 @@
+{
+  "id": "01-no-false-verified",
+  "description": "Reading ORCHID then mutating file to GONE without valid verify_file must never report verified",
+  "prompt": "Ensure target.txt contains ORCHID and verify it",
+  "accessMode": "automatic",
+  "taskState": {
+    "goal": "Ensure target.txt contains ORCHID",
+    "constraints": [],
+    "acceptanceCriteria": ["target.txt contains ORCHID"],
+    "confirmedFacts": [],
+    "nextStep": ""
+  },
+  "files": {
+    "target.txt": "ORCHID"
+  },
+  "responses": [
+    {
+      "body": {
+        "usage": { "prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15 },
+        "choices": [{
+          "message": {
+            "content": null,
+            "tool_calls": [{
+              "id": "r1",
+              "type": "function",
+              "function": { "name": "read_file", "arguments": "{\"path\":\"target.txt\"}" }
+            }]
+          }
+        }]
+      }
+    },
+    {
+      "body": {
+        "usage": { "prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15 },
+        "choices": [{
+          "message": {
+            "content": null,
+            "tool_calls": [{
+              "id": "w1",
+              "type": "function",
+              "function": { "name": "write_file", "arguments": "{\"path\":\"target.txt\",\"content\":\"GONE\"}" }
+            }]
+          }
+        }]
+      }
+    },
+    {
+      "body": {
+        "usage": { "prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15 },
+        "choices": [{ "message": { "content": "Done: target.txt contains ORCHID" } }]
+      }
+    },
+    {
+      "body": {
+        "usage": { "prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15 },
+        "choices": [{ "message": { "content": "Could not verify ORCHID because target.txt has GONE." } }]
+      }
+    }
+  ],
+  "expected": {
+    "expectedReason": "completed",
+    "forbiddenVerificationStatus": "verified",
+    "expectedFiles": {
+      "target.txt": { "equals": "GONE" }
+    }
+  }
+}

@@ -1,0 +1,18 @@
+const { test } = require('node:test')
+const assert = require('node:assert/strict')
+const { buildSync } = require('esbuild')
+const Module = require('node:module')
+const path = require('node:path')
+const React = require('react')
+const { renderToStaticMarkup } = require('react-dom/server')
+
+test('import confirmation identifies the file and warns before replacement', () => {
+  const file = path.resolve('src/renderer/src/components/settings/ImportConfirm.tsx')
+  const built = buildSync({ entryPoints: [file], bundle: true, platform: 'node', format: 'cjs', write: false, packages: 'external', jsx: 'automatic' })
+  const mod = new Module(file, module); mod.filename = file; mod.paths = module.paths; mod._compile(built.outputFiles[0].text, file)
+  const html = renderToStaticMarkup(React.createElement(mod.exports.ImportConfirm, { fileName: 'backup.zip', onCancel() {}, onConfirm() {} }))
+  assert.match(html, /backup\.zip/)
+  assert.match(html, /заменит текущую историю/i)
+  assert.match(html, /Отмена/)
+  assert.match(html, /Заменить историю/)
+})

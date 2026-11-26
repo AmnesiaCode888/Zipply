@@ -1,0 +1,69 @@
+{
+  "id": "06-bugfix-and-verify",
+  "description": "End-to-end bugfix of math.js with real node --test execution inside workspace-write sandbox and independent verification",
+  "prompt": "Fix add() in math.js and verify node --test math.test.js passes",
+  "accessMode": "automatic",
+  "taskState": {
+    "goal": "Fix add() in math.js",
+    "constraints": [],
+    "acceptanceCriteria": ["node --test math.test.js passes"],
+    "confirmedFacts": [],
+    "nextStep": ""
+  },
+  "files": {
+    "math.js": "exports.add = (a, b) => a - b;\n",
+    "math.test.js": "const assert = require('node:assert/strict');\nconst { test } = require('node:test');\nconst { add } = require('./math.js');\ntest('add sums two numbers', () => assert.equal(add(2, 3), 5));\n"
+  },
+  "responses": [
+    {
+      "body": {
+        "usage": { "prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15 },
+        "choices": [{
+          "message": {
+            "content": null,
+            "tool_calls": [{
+              "id": "ed1",
+              "type": "function",
+              "function": {
+                "name": "edit_file",
+                "arguments": "{\"path\":\"math.js\",\"target\":\"a - b\",\"replacement\":\"a + b\"}"
+              }
+            }]
+          }
+        }]
+      }
+    },
+    {
+      "body": {
+        "usage": { "prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15 },
+        "choices": [{
+          "message": {
+            "content": null,
+            "tool_calls": [{
+              "id": "tst1",
+              "type": "function",
+              "function": {
+                "name": "exec_command",
+                "arguments": "{\"command\":\"node --test math.test.js\"}"
+              }
+            }]
+          }
+        }]
+      }
+    },
+    {
+      "body": {
+        "usage": { "prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15 },
+        "choices": [{ "message": { "content": "Fixed add() in math.js and verified node --test math.test.js passed." } }]
+      }
+    }
+  ],
+  "expected": {
+    "expectedReason": "completed",
+    "expectedVerificationStatus": "verified",
+    "expectedFiles": {
+      "math.js": { "contains": ["a + b"] }
+    },
+    "verifyCommand": "node --test math.test.js"
+  }
+}
